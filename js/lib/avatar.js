@@ -158,29 +158,31 @@ function drawCape(top) {
 function hairBack(style, color) {
   const c = color, s = `fill="${c}" ${SW}`;
   switch (style) {
-    case 'long': return `<path d="M52 74 C46 26 154 26 148 74 L156 168 C134 182 66 182 44 168 Z" ${s}/>`;
-    case 'bob': return `<path d="M50 78 C44 26 156 26 150 78 L152 122 C140 132 60 132 48 122 Z" ${s}/>`;
+    case 'long': return `<path d="M48 80 C42 10 158 10 152 80 L158 168 C134 182 66 182 42 168 Z" ${s}/>`;
+    case 'bob': return `<path d="M46 80 C40 10 160 10 154 80 L156 124 C142 134 58 134 44 124 Z" ${s}/>`;
     case 'ponytail': return `<path d="M140 52 C176 50 182 96 160 128 C168 98 160 74 140 70 Z" ${s}/>`;
     case 'pigtails': return `<circle cx="46" cy="70" r="17" ${s}/><circle cx="154" cy="70" r="17" ${s}/>
       <path d="M40 84 C30 110 36 132 44 140 C48 120 52 104 54 88Z" ${s}/><path d="M160 84 C170 110 164 132 156 140 C152 120 148 104 146 88Z" ${s}/>`;
-    case 'curly': return `<path d="M52 92 C40 40 160 40 148 92 L150 112 C140 120 60 120 50 112 Z" ${s}/>`;
+    case 'curly': return `<path d="M46 96 C36 20 164 20 154 96 L154 114 C140 124 60 124 46 114 Z" ${s}/>`;
     default: return '';
   }
 }
 
 function hairFront(style, color) {
   const s = `fill="${color}" ${SW}`;
+  // 바깥선은 머리 꼭대기보다 위로 올라가서 정수리를 모두 덮어요
+  const TOP = 'M48 88 C42 8 158 8 152 88';
   switch (style) {
-    case 'short': return `<path d="M53 82 C46 28 154 28 147 82 C140 64 128 56 112 58 C104 50 88 50 80 58 C68 58 58 66 53 82 Z" ${s}/>`;
-    case 'side': return `<path d="M53 84 C44 26 156 26 147 84 C144 70 138 62 130 60 C110 62 84 58 72 46 C66 58 60 70 53 84 Z" ${s}/>`;
+    case 'short': return `<path d="${TOP} C148 70 138 60 122 62 C114 56 100 56 92 60 C80 56 66 60 58 70 C54 76 50 82 48 88 Z" ${s}/>`;
+    case 'side': return `<path d="${TOP} C148 74 142 64 132 62 C112 64 86 60 72 48 C64 60 54 74 48 88 Z" ${s}/>`;
     case 'bob':
     case 'long':
     case 'ponytail':
-    case 'pigtails': return `<path d="M52 84 C46 26 154 26 148 84 C146 72 140 62 132 58 C124 66 112 60 104 54 C94 64 78 62 70 56 C60 62 54 72 52 84 Z" ${s}/>`;
-    case 'spiky': return `<path d="M52 84 L48 50 L62 56 L64 30 L80 46 L92 22 L104 44 L118 24 L126 46 L142 32 L140 56 L154 52 L148 84 C140 66 120 58 100 58 C80 58 60 66 52 84 Z" ${s}/>`;
-    case 'curly': return [[60, 62], [72, 46], [90, 38], [110, 38], [128, 46], [140, 62], [56, 80], [144, 80]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="15" fill="${color}" stroke="${OUT}" stroke-width="2.2"/>`).join('')
-      + `<path d="M58 70 C70 52 130 52 142 70 L140 60 C120 40 80 40 60 60 Z" fill="${color}"/>`;
-    case 'buzz': return `<path d="M54 76 C50 34 150 34 146 76 C130 58 70 58 54 76 Z" fill="${color}" opacity="0.55"/>`;
+    case 'pigtails': return `<path d="${TOP} C148 74 142 64 132 60 C124 68 112 62 104 56 C94 66 78 64 70 58 C60 64 52 76 48 88 Z" ${s}/>`;
+    case 'spiky': return `<path d="M48 88 L42 46 L60 50 L62 22 L80 34 L92 10 L106 30 L120 12 L128 34 L144 22 L142 50 L158 46 L152 88 C142 68 122 60 100 60 C78 60 58 68 48 88 Z" ${s}/>`;
+    case 'curly': return `<path d="${TOP} C140 66 60 66 48 88 Z" fill="${color}"/>`
+      + [[58, 64], [70, 44], [88, 32], [108, 30], [126, 40], [140, 58], [52, 84], [148, 84], [80, 62], [100, 58], [120, 62]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="14" fill="${color}" stroke="${OUT}" stroke-width="2"/>`).join('');
+    case 'buzz': return `<path d="M50 80 C44 14 156 14 150 80 C132 62 68 62 50 80 Z" fill="${color}" opacity="0.8" ${SW}/>`;
     default: return '';
   }
 }
@@ -271,11 +273,12 @@ function drawBottom(id, skin) {
 function drawShoes(id) {
   const col = { s_white: '#f8f9fa', s_black: '#343a40', s_red: '#e03131', s_rain: '#fcc419', s_boots: '#8d5a2b', s_gold: '#fab005' }[id] || '#f8f9fa';
   const boot = id === 's_rain' || id === 's_boots';
+  // 다리 가운데(왼 83, 오른 117)에 맞춰 좌우 대칭으로
   const one = (x) => (boot
-    ? `<path d="M${x - 11} 226 L${x + 11} 226 L${x + 11} 248 Q${x + 20} 250 ${x + 18} 258 L${x - 13} 258 Z" fill="${col}" ${SW}/>`
-    : `<path d="M${x - 13} 256 Q${x - 14} 242 ${x} 242 Q${x + 16} 242 ${x + 18} 256 Z" fill="${col}" ${SW}/><path d="M${x - 13} 256 L${x + 18} 256" stroke="${OUT}" stroke-width="2"/>`);
-  const shine = id === 's_gold' ? `<circle cx="78" cy="248" r="2" fill="#fff"/><circle cx="110" cy="248" r="2" fill="#fff"/>` : '';
-  return one(84) + one(116) + shine;
+    ? `<path d="M${x - 12} 228 L${x + 12} 228 L${x + 13} 250 Q${x + 15} 258 ${x + 8} 258 L${x - 8} 258 Q${x - 15} 258 ${x - 13} 250 Z" fill="${col}" ${SW}/><path d="M${x - 12} 234 L${x + 12} 234" stroke="${OUT}" stroke-width="1.5" opacity="0.5"/>`
+    : `<path d="M${x - 15} 257 Q${x - 16} 241 ${x} 241 Q${x + 16} 241 ${x + 15} 257 Z" fill="${col}" ${SW}/><path d="M${x - 15} 257 L${x + 15} 257" stroke="${OUT}" stroke-width="2.4"/><path d="M${x - 5} 246 L${x + 5} 246" stroke="${OUT}" stroke-width="1.5" opacity="0.4"/>`);
+  const shine = id === 's_gold' ? `<circle cx="78" cy="248" r="2" fill="#fff"/><circle cx="112" cy="248" r="2" fill="#fff"/>` : '';
+  return one(83) + one(117) + shine;
 }
 
 function drawGlasses(id) {
