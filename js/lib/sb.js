@@ -67,8 +67,9 @@ export function friendlyError(e) {
   const m = String(e?.message || e || '');
   if (/Invalid login credentials/i.test(m)) return '아이디나 비밀번호가 맞지 않아요.';
   if (/already registered|already been registered|User already/i.test(m)) return '이미 있는 아이디예요.';
-  if (/Signups not allowed|signup.*disabled/i.test(m)) return 'Supabase에서 새 계정 만들기가 꺼져 있어요. (Authentication → Sign In / Providers → Allow new users to sign up)';
+  if (/email (signups|logins|provider).*disabled|email.*not enabled/i.test(m)) return `Supabase에서 이메일 로그인 방식이 꺼져 있어요. (Authentication → Sign In / Providers → 아래 목록의 Email → Enable Email provider 켜기) [${m}]`;
+  if (/Signups not allowed|signup.*disabled/i.test(m)) return `Supabase에서 새 계정 만들기가 꺼져 있어요. (Authentication → Sign In / Providers → Allow new users to sign up) [${m}]`;
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return '인터넷 연결을 확인해 주세요.';
   if (/rate limit/i.test(m)) return '잠시 후에 다시 해 주세요. (요청이 너무 많아요)';
-  return m || '알 수 없는 오류가 났어요.';
+  return m ? `오류: ${m}` : '알 수 없는 오류가 났어요.';
 }
