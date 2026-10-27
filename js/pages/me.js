@@ -2,7 +2,7 @@ import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
 import { computeBadges, XP_GUIDE, levelTitle } from '../lib/xp.js';
 import { Loading, ErrorBox, XPBar, toast, fmtDate } from '../components/ui.js';
-import { AvatarImg } from '../components/avatar-ui.js';
+import { AvatarImg, StatPanel } from '../components/avatar-ui.js';
 import { ITEM } from '../lib/avatar.js';
 
 const KIND_LABEL = {
@@ -61,6 +61,11 @@ export function MePage({ profile, refreshProfile }) {
       <div class="card stat"><div class="stat-num">${solved}</div><div>푼 문제</div></div>
       <div class="card stat"><div class="stat-num">${solved ? Math.round((right / solved) * 100) : 0}%</div><div>정답률</div></div>
       <div class="card stat"><div class="stat-num">${profile.stat_points}<small>/${profile.skill_points}</small></div><div>스탯/스킬 포인트</div></div>
+    </section>
+
+    <section class="card">
+      <h2>💪 내 능력치</h2>
+      <${StatPanel} profile=${profile} onChange=${refreshProfile} />
     </section>
 
     <section>

@@ -2,7 +2,8 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { ITEMS, ITEM, SLOTS, cleanCfg } from '../lib/avatar.js';
-import { AvatarImg } from '../components/avatar-ui.js';
+import { AvatarImg, ItemStats, RarityTag, StatPanel } from '../components/avatar-ui.js';
+import { RARITY } from '../lib/avatar.js';
 import { Loading, ErrorBox, Modal, toast } from '../components/ui.js';
 
 export async function loadInventory(userId) {
@@ -17,7 +18,7 @@ export function canWear(item, owned, level) {
   return (item.price === 0 && item.level <= level) || owned.has(item.id);
 }
 
-const FULL_SLOTS = ['top', 'bottom', 'shoes', 'held', 'bg', 'pet'];
+const FULL_SLOTS = ['top', 'bottom', 'shoes', 'held', 'shield', 'armor', 'acc', 'bg', 'pet'];
 const SHOP_SLOTS = Object.keys(SLOTS);
 
 export function ShopPage({ profile, refreshProfile }) {
@@ -77,6 +78,7 @@ export function ShopPage({ profile, refreshProfile }) {
         ${Object.keys(tryOn).length > 0 && html`<button class="btn small" onClick=${() => setTryOn({})}>↩️ 원래대로</button>`}
         <a class="btn small" href="#/avatar">🧑‍🎨 내 옷장</a>
       </div>
+      <${StatPanel} profile=${profile} cfg=${preview} editable=${false} />
     </div>
 
     <div class="tabs">${SHOP_SLOTS.map((s) => html`<button class=${'tab' + (slot === s ? ' on' : '')} onClick=${() => setSlot(s)}>${SLOTS[s]}</button>`)}</div>
@@ -86,11 +88,13 @@ export function ShopPage({ profile, refreshProfile }) {
       const lvLock = profile.level < it.level;
       const poor = profile.coins < it.price;
       const mode = FULL_SLOTS.includes(it.slot) ? 'full' : 'portrait';
-      return html`<div class=${'card shop-item' + (tryOn[it.slot] === it.id ? ' trying' : '') + (lvLock ? ' lv-lock' : '')}>
+      return html`<div class=${'card shop-item' + (tryOn[it.slot] === it.id ? ' trying' : '') + (lvLock ? ' lv-lock' : '')} style=${it.rarity !== 'common' ? `border-top:5px solid ${RARITY[it.rarity][1]}` : ''}>
+        <${RarityTag} item=${it} />
         <button class="shop-preview" onClick=${() => setTryOn({ ...tryOn, [it.slot]: it.id })} title="입어 보기">
           <${AvatarImg} cfg=${{ ...base, [it.slot]: it.id }} mode=${mode} size=${mode === 'full' ? 90 : 110} />
         </button>
         <b>${it.name}</b>
+        <${ItemStats} item=${it} />
         ${have
           ? (base[it.slot] === it.id
             ? html`<span class="pill good">입고 있어요</span>`
@@ -105,7 +109,8 @@ export function ShopPage({ profile, refreshProfile }) {
     ${confirm && html`<${Modal} onClose=${() => setConfirm(null)}>
       <div class="center">
         <${AvatarImg} cfg=${{ ...base, [confirm.slot]: confirm.id }} mode="full" size=${140} />
-        <h2>${confirm.name}</h2>
+        <h2>${confirm.name} <${RarityTag} item=${confirm} /></h2>
+        <${ItemStats} item=${confirm} />
         <p>🪙 <b>${confirm.price}</b> 코인을 쓸까요?<br/><small class="muted">남는 코인: ${profile.coins - confirm.price}</small></p>
         <div class="btn-col">
           <button class="btn big primary block" disabled=${busy} onClick=${() => buy(confirm, true)}>사서 바로 입기 ✨</button>

@@ -108,6 +108,15 @@ window.APP_CONFIG = {
 - 아이템 가격·레벨은 `js/lib/avatar.js`의 `ITEMS`에 있고, 바꾼 뒤 `node tools/gen-shop-sql.mjs`로 만든 SQL을 Supabase에 실행하면 돼요. (필요하면 Claude에게 부탁하세요)
 - ⚠️ 이 기능이 생기기 전에 Supabase를 설정했다면 [`supabase/update-03-avatar-shop.sql`](supabase/update-03-avatar-shop.sql)을 SQL Editor에서 **한 번** 실행해 주세요.
 
+## 5-2. ⚔️ RPG 장비 · 능력치
+
+- 장비 칸: **모자·투구, 갑옷, 무기·소품(오른손), 방패(왼손), 장신구(목걸이·날개 등)** — 옷 위에 겹쳐 입어요.
+- 아이템마다 능력치가 있어요: ⚔️ 공격 · 🛡️ 방어 · ❤️ 체력 · 🍀 행운, 등급은 일반 / 희귀(파랑) / 영웅(보라) / 전설(주황).
+- 내 능력치 = 기본값 + **스탯 포인트 투자** + 장비. 레벨업마다 스탯 포인트 3개를 받아 꾸미기·내 정보 화면에서 직접 투자해요.
+- **전투력** = 공격×3 + 방어×2 + 체력 + 행운×2 (3단계 보드게임에서 사용할 예정)
+- 얼굴은 동글동글한 캐릭터 스타일로, 눈 9 · 눈썹 5 · 코 4 · 입 8 · 볼 3가지 중에서 골라요.
+- ⚠️ 이 기능이 생기기 전에 Supabase를 설정했다면 [`supabase/update-04-rpg-gear.sql`](supabase/update-04-rpg-gear.sql)을 SQL Editor에서 **한 번** 실행해 주세요. (업데이트 3을 먼저)
+
 ## 6. 알아 두면 좋은 것
 
 - **Supabase 무료 플랜은 1주일 동안 아무도 접속하지 않으면 일시정지**됩니다. 방학 뒤에는 Supabase 대시보드에서 **Restore project**를 눌러 주세요. (데이터는 그대로예요.)

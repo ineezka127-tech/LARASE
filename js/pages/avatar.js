@@ -2,7 +2,7 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { rpc, friendlyError } from '../lib/sb.js';
 import { ITEM, SLOTS, cleanCfg } from '../lib/avatar.js';
-import { AvatarImg, OptionGrid, BASIC_TABS, itemOptions } from '../components/avatar-ui.js';
+import { AvatarImg, OptionGrid, BASIC_TABS, itemOptions, StatPanel } from '../components/avatar-ui.js';
 import { loadInventory, canWear } from './shop.js';
 import { Loading, ErrorBox, toast, go } from '../components/ui.js';
 
@@ -65,6 +65,7 @@ export function AvatarPage({ profile, refreshProfile }) {
         <button class="btn big primary block" disabled=${!dirty || saving} onClick=${save}>${saving ? '저장 중…' : dirty ? '💾 저장하기' : '✔ 저장됨'}</button>
         ${dirty && html`<button class="btn ghost block" onClick=${() => setCfg(cleanCfg(profile.avatar_cfg))}>↩️ 처음으로</button>`}
         <a class="btn block" href="#/shop">🛍️ 상점 가기 (🪙 ${profile.coins})</a>
+        <${StatPanel} profile=${profile} cfg=${cfg} onChange=${refreshProfile} />
       </div>
       <div class="closet-body">
         <h1>🧑‍🎨 내 캐릭터 꾸미기</h1>
