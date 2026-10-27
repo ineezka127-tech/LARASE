@@ -4,9 +4,9 @@
 // =====================================================================
 window.APP_CONFIG = {
   // Project URL  (예: https://abcdefghijkl.supabase.co)
-  SUPABASE_URL: "여기에_PROJECT_URL",
+  SUPABASE_URL: "https://ekuspzoycrtabcxvhpxm.supabase.co",
   // anon public key 또는 publishable key  (공개되어도 괜찮은 키입니다)
-  SUPABASE_KEY: "여기에_ANON_또는_PUBLISHABLE_KEY",
+  SUPABASE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrdXNwem95Y3J0YWJjeHZocHhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwMzU4ODgsImV4cCI6MjEwODYxMTg4OH0._e1sEDEPCT8N-umaRyUSGUlD7KDAof4-KXLhHVcvqb4",
 
   // 아래는 바꾸지 않아도 됩니다.
   APP_NAME: "복습 교실",
