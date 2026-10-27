@@ -1,6 +1,7 @@
 import { html, useState } from '../../vendor/preact-htm.js';
-import { sb, signIn, createAccount, friendlyError, normalizeLoginId } from '../lib/sb.js';
-import { AVATARS } from '../lib/xp.js';
+import { sb, rpc, signIn, createAccount, friendlyError, normalizeLoginId } from '../lib/sb.js';
+import { cleanCfg } from '../lib/avatar.js';
+import { AvatarBuilder } from './avatar.js';
 
 function recentIds() {
   try { return JSON.parse(localStorage.getItem('bokseup-recent-ids') || '[]'); } catch { return []; }
@@ -96,42 +97,51 @@ export function SetupPage({ onDone }) {
   </div>`;
 }
 
-export function AvatarPicker({ level, value, onPick }) {
-  return html`<div class="avatar-grid">${AVATARS.map(([a, lv]) => {
-    const locked = level < lv;
-    return html`<button type="button" class=${'avatar-opt' + (a === value ? ' on' : '') + (locked ? ' locked' : '')}
-      disabled=${locked} onClick=${() => onPick(a)} title=${locked ? `레벨 ${lv}에 열려요` : ''}>
-      <span>${a}</span>${locked && html`<small>🔒Lv.${lv}</small>`}
-    </button>`;
-  })}</div>`;
-}
-
 export function Onboarding({ profile, onDone }) {
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState(profile.avatar || '🐣');
+  const [cfg, setCfg] = useState(cleanCfg(profile.avatar_cfg));
+  const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  const save = async (e) => {
+  const next = (e) => {
     e.preventDefault();
-    const n = name.trim();
-    if (!n) { setErr('이름을 써 주세요.'); return; }
+    if (!name.trim()) { setErr('이름을 써 주세요.'); return; }
+    setErr(''); setStep(2);
+  };
+  const save = async () => {
     setBusy(true);
-    const { error } = await sb.from('profiles').update({ display_name: n.slice(0, 12), avatar }).eq('id', profile.id);
+    try {
+      const { error } = await sb.from('profiles').update({ display_name: name.trim().slice(0, 12) }).eq('id', profile.id);
+      if (error) throw error;
+      await rpc('save_avatar', { p_cfg: cfg });
+      onDone();
+    } catch (ex) { setErr(friendlyError(ex)); }
     setBusy(false);
-    if (error) setErr(friendlyError(error)); else onDone();
   };
 
+  if (step === 1) {
+    return html`<div class="login-wrap">
+      <form class="card login" onSubmit=${next}>
+        <div class="login-logo">👋</div>
+        <h1>반가워요!</h1>
+        <p>화면에 보일 <b>내 이름</b>을 정해요.</p>
+        <input class="input big center" maxlength="12" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="이름 또는 별명" />
+        ${err && html`<div class="error-box">${err}</div>`}
+        <button class="btn big primary block">다음 ▶</button>
+      </form>
+    </div>`;
+  }
   return html`<div class="login-wrap">
-    <form class="card login wide" onSubmit=${save}>
-      <div class="login-logo">${avatar}</div>
-      <h1>반가워요! 👋</h1>
-      <p>화면에 보일 <b>내 이름</b>을 정해요.</p>
-      <input class="input big center" maxlength="12" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="이름 또는 별명" />
-      <p>내 캐릭터를 골라요.</p>
-      <${AvatarPicker} level=${profile.level} value=${avatar} onPick=${setAvatar} />
+    <div class="card login wide">
+      <h1>${name}님의 캐릭터를 만들어요 🎨</h1>
+      <p class="muted">옷과 모자는 코인을 모아서 상점에서 살 수 있어요!</p>
+      <${AvatarBuilder} cfg=${cfg} onChange=${setCfg} />
       ${err && html`<div class="error-box">${err}</div>`}
-      <button class="btn big primary block" disabled=${busy}>시작하기 🚀</button>
-    </form>
+      <div class="btn-row center-row">
+        <button class="btn" onClick=${() => setStep(1)}>◀ 이름 다시 쓰기</button>
+        <button class="btn big primary" disabled=${busy} onClick=${save}>완성! 시작하기 🚀</button>
+      </div>
+    </div>
   </div>`;
 }

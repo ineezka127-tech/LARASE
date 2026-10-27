@@ -73,8 +73,11 @@ export function RewardLayer({ onChange }) {
     };
     const onReward = (e) => {
       const r = e.detail;
-      if (r.xp > 0) push(`+${r.xp} XP`, 'xp');
-      if (r.bonus > 0) push(`🔥 ${r.streak}일 연속 출석! +${r.bonus} XP`, 'xp');
+      const dailyCoins = r.bonus > 0 ? 3 : 0;
+      const levelCoins = r.leveled_up ? 20 * (r.level - r.old_level) : 0;
+      const coins = (r.coins || 0) - dailyCoins - levelCoins;
+      if (r.xp > 0 || coins > 0) push([r.xp > 0 && `+${r.xp} XP`, coins > 0 && `+${coins} 🪙`].filter(Boolean).join('  '), 'xp');
+      if (r.bonus > 0) push(`🔥 ${r.streak}일 연속 출석! +${r.bonus} XP  +${dailyCoins} 🪙`, 'xp');
       if (r.leveled_up) setLevelUp(r);
       onChange?.();
     };
@@ -96,7 +99,8 @@ export function RewardLayer({ onChange }) {
         <h2>레벨 업!</h2>
         <div class="levelup-num">Lv.${levelUp.old_level} → <b>Lv.${levelUp.level}</b></div>
         <div class="levelup-title">${levelTitle(levelUp.level)}</div>
-        <p class="muted">스탯 포인트 +${3 * (levelUp.level - levelUp.old_level)} · 스킬 포인트 +${levelUp.level - levelUp.old_level}<br/><small>(보드게임이 열리면 쓸 수 있어요!)</small></p>
+        <p class="levelup-coin">🪙 +${20 * (levelUp.level - levelUp.old_level)} 코인 보너스!</p>
+        <p class="muted">스탯 포인트 +${3 * (levelUp.level - levelUp.old_level)} · 스킬 포인트 +${levelUp.level - levelUp.old_level}<br/><small>(보드게임이 열리면 쓸 수 있어요!) · 새 아이템이 열렸는지 상점을 확인해 보세요 🛍️</small></p>
         <button class="btn big primary" onClick=${() => setLevelUp(null)}>멋져요!</button>
       </div>
     <//>`}

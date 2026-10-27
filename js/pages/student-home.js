@@ -1,6 +1,7 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
 import { Loading, ErrorBox, XPBar, fmtDate } from '../components/ui.js';
+import { AvatarImg } from '../components/avatar-ui.js';
 
 // 학생 화면에서 함께 쓰는 진도 정보 불러오기
 export async function loadProgress(userId) {
@@ -48,17 +49,22 @@ export function StudentHome({ profile }) {
 
   return html`<div class="page">
     <section class="hero card">
-      <div class="hero-avatar">${profile.avatar}</div>
+      <a class="hero-avatar" href="#/avatar" title="꾸미기"><${AvatarImg} cfg=${profile.avatar_cfg} mode="full" size=${120} /></a>
       <div class="hero-body">
         <h1>${profile.display_name}님, 안녕하세요!</h1>
         <${XPBar} xp=${profile.xp} />
         <div class="hero-stats">
           <span class="pill">🔥 ${profile.streak || 0}일 연속</span>
           <span class="pill">⭐ ${profile.xp} XP</span>
+          <a class="pill coin" href="#/shop">🪙 ${profile.coins ?? 0} 코인</a>
           ${wrongTotal > 0 && html`<span class="pill warn">💪 다시 풀 문제 ${wrongTotal}개</span>`}
         </div>
       </div>
     </section>
+
+    ${!profile.avatar_cfg && html`<a class="card row-card highlight" href="#/avatar">
+      <span class="big-emoji">🧑‍🎨</span><div><b>내 캐릭터를 만들어 보세요!</b><div class="muted">얼굴, 머리 모양을 고르고 🪙 코인으로 옷도 살 수 있어요.</div></div>
+    </a>`}
 
     ${replies.length > 0 && html`<section>
       <h2>💌 선생님이 확인했어요</h2>

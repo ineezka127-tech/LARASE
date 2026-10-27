@@ -6,6 +6,9 @@ import { StudentHome } from './pages/student-home.js';
 import { LessonView } from './pages/lesson.js';
 import { QuizPage } from './pages/quiz.js';
 import { MePage } from './pages/me.js';
+import { AvatarPage } from './pages/avatar.js';
+import { ShopPage } from './pages/shop.js';
+import { AvatarImg } from './components/avatar-ui.js';
 import { TeacherHome, StudentDetail } from './pages/teacher-home.js';
 import { LessonList, LessonEditor } from './pages/teacher-lessons.js';
 import { GradingPage } from './pages/grading.js';
@@ -39,11 +42,11 @@ function Header({ profile }) {
     <nav>
       ${teacher
         ? html`${link('#/', '📊 현황')}${link('#/t/lessons', '📚 수업 자료')}${link('#/t/grading', '📝 채점')}${link('#/t/students', '👥 학생')}`
-        : html`${link('#/', '🏠 홈')}${link('#/me', '🙋 내 정보')}`}
+        : html`${link('#/', '🏠 홈')}${link('#/avatar', '🧑‍🎨 꾸미기')}${link('#/shop', '🛍️ 상점')}${link('#/me', '🙋 내 정보')}`}
     </nav>
     ${teacher
       ? html`<button class="btn small ghost" onClick=${() => sb.auth.signOut()}>로그아웃</button>`
-      : html`<a class="me-chip" href="#/me"><span class="me-avatar">${profile.avatar}</span><${XPBar} xp=${profile.xp} compact /></a>`}
+      : html`<a class="me-chip" href="#/me"><${AvatarImg} cfg=${profile.avatar_cfg} size=${40} /><span class="me-chip-body"><${XPBar} xp=${profile.xp} compact /><span class="coin-chip">🪙 ${profile.coins ?? 0}</span></span></a>`}
   </header>`;
 }
 
@@ -97,6 +100,8 @@ function App() {
   if (p0 === 'lesson') page = html`<${LessonView} key=${p1} lessonId=${p1} ...${ctx} />`;
   else if (p0 === 'quiz') page = html`<${QuizPage} key=${p1 + JSON.stringify(route.query)} lessonId=${p1} ...${ctx} />`;
   else if (p0 === 'me' && !teacher) page = html`<${MePage} ...${ctx} />`;
+  else if (p0 === 'avatar' && !teacher) page = html`<${AvatarPage} ...${ctx} />`;
+  else if (p0 === 'shop' && !teacher) page = html`<${ShopPage} ...${ctx} />`;
   else if (teacher && p0 === 't') {
     const sub = p1;
     if (sub === 'lessons') page = html`<${LessonList} />`;

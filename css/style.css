@@ -445,3 +445,58 @@ input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; accent-
 .frac-edit-nd { display: inline-flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--line); padding-left: 8px; }
 @media (max-width: 600px) { .fi-slot { width: 84px; height: 70px; font-size: 1.9em; } .fi-slot.whole { width: 84px; height: 100px; } .fi-bar { width: 100px; } }
 .fi-sub { font-size: 0.8em; font-weight: 400; white-space: nowrap; }
+
+/* ---------- 아바타 · 코인 · 상점 ---------- */
+.avatar-img { display: inline-block; flex: none; line-height: 0; }
+.avatar-img svg { width: 100%; height: 100%; display: block; }
+.avatar-img.portrait svg { border-radius: 50%; box-shadow: 0 0 0 3px #fff, 0 2px 8px rgba(40, 50, 120, 0.15); }
+.avatar-img.full svg { border-radius: 16px; }
+.me-chip-body { display: flex; flex-direction: column; gap: 2px; min-width: 110px; }
+.coin-chip { font-size: 0.75em; font-weight: 800; color: #9a6b00; }
+.pill.coin { background: #fff4cc; color: #9a6b00; }
+.coin-text { color: #9a6b00; font-weight: 700; }
+.coin-big { font-size: 2em; font-weight: 900; color: #9a6b00; }
+.hero-avatar { line-height: 0; }
+.row-card.highlight { border: 3px solid var(--gold); }
+.me-photo { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--primary); font-weight: 700; }
+a.card.stat { color: var(--ink); }
+.levelup-coin { font-size: 1.3em; font-weight: 800; color: #9a6b00; margin: 8px 0 0; }
+
+.builder { display: flex; gap: 16px; align-items: flex-start; text-align: left; margin: 12px 0; }
+.builder-preview { position: sticky; top: 80px; }
+.builder-body { flex: 1; min-width: 0; }
+.small-tabs .tab { padding: 8px 14px; font-size: 0.9em; }
+.tab-group-label { font-size: 0.8em; font-weight: 800; color: var(--muted); margin-top: 6px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 12px; padding: 6px 0; }
+.swatch { width: 56px; height: 56px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 0 2px var(--line); cursor: pointer; }
+.swatch.on { box-shadow: 0 0 0 4px var(--primary); }
+.opt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.opt { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 3px solid var(--line); border-radius: 16px; background: #fff; cursor: pointer; font: inherit; color: var(--ink); }
+.opt small { font-size: 0.75em; font-weight: 600; text-align: center; line-height: 1.2; }
+.opt.on { border-color: var(--primary); background: var(--primary-soft); }
+.opt.locked .avatar-img { filter: grayscale(0.6) opacity(0.55); }
+.opt-lock { position: absolute; top: 4px; right: 4px; background: #1f2440; color: #fff; font-size: 0.7em; font-weight: 800; border-radius: 999px; padding: 1px 7px; }
+.opt-none { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 1.8em; color: var(--muted); }
+.closet-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+.closet-preview { position: sticky; top: 80px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.closet-portrait { display: flex; align-items: center; gap: 8px; }
+.closet-body h1 { margin-top: 0; }
+.shop-top { display: flex; gap: 20px; align-items: center; background: linear-gradient(135deg, #fffaf0, #fff4cc); }
+.shop-info { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.shop-info h1 { margin: 0; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.shop-item { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 12px; }
+.shop-item.trying { border: 3px solid var(--primary); }
+.shop-item.lv-lock { opacity: 0.7; }
+.shop-preview { border: none; background: none; padding: 0; cursor: pointer; line-height: 0; }
+.give-coins h2 { margin-top: 0; }
+@media (max-width: 760px) {
+  .closet-layout { grid-template-columns: 1fr; }
+  .closet-preview { position: static; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .builder { flex-direction: column; align-items: center; }
+  .builder-preview { position: static; }
+  .shop-top { flex-direction: column; text-align: center; }
+  .shop-info { align-items: center; }
+}
+.shop-item .pill { white-space: nowrap; }
+.closet-preview .btn { font-size: 0.95em; }

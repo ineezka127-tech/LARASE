@@ -3,6 +3,8 @@ import { sb, friendlyError } from '../lib/sb.js';
 import { answerText, TYPES } from '../lib/questions.js';
 import { Loading, ErrorBox, XPBar, fmtDate, timeAgo } from '../components/ui.js';
 import { RichText } from '../components/math.js';
+import { AvatarImg } from '../components/avatar-ui.js';
+import { GiveCoins } from '../components/give-coins.js';
 import { fracToken } from '../lib/fraction.js';
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
@@ -50,11 +52,11 @@ export function TeacherHome() {
     <div class="grid">${d.students.map((s) => {
       const st = stat(s.id);
       return html`<a class="card student-card" href=${'#/t/student/' + s.id}>
-        <div class="sc-head"><span class="sc-avatar">${s.avatar}</span>
+        <div class="sc-head"><${AvatarImg} cfg=${s.avatar_cfg} size=${52} />
           <div><b>${s.display_name || '(이름 없음)'}</b><div class="muted small">${s.login_id}${s.grade ? ` · ${s.grade}학년` : ''}</div></div></div>
         <${XPBar} xp=${s.xp} compact />
         <div class="sc-stats">
-          <span>🔥 ${s.streak}일</span><span>이번 주 ${st.week}문제</span><span>정답률 ${st.acc}</span>
+          <span>🔥 ${s.streak}일</span><span>🪙 ${s.coins ?? 0}</span><span>이번 주 ${st.week}문제</span><span>정답률 ${st.acc}</span>
         </div>
         <div class="muted small">마지막 활동: ${timeAgo(st.last)}</div>
       </a>`;
@@ -82,6 +84,7 @@ export function TeacherHome() {
 export function StudentDetail({ studentId }) {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(null);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -94,7 +97,7 @@ export function StudentDetail({ studentId }) {
       for (const r of [p, a, l, e]) if (r.error) throw r.error;
       setD({ s: p.data, attempts: a.data, lessons: l.data, views: e.data });
     })().catch((x) => setErr(friendlyError(x)));
-  }, [studentId]);
+  }, [studentId, reload]);
 
   if (err) return html`<div class="page"><${ErrorBox} error=${err} /></div>`;
   if (!d) return html`<${Loading} />`;
@@ -108,13 +111,15 @@ export function StudentDetail({ studentId }) {
   return html`<div class="page">
     <a class="back" href="#/">← 현황</a>
     <section class="card me-card">
-      <div class="me-big-avatar">${s.avatar}</div>
+      <${AvatarImg} cfg=${s.avatar_cfg} mode="full" size=${120} />
       <div class="hero-body">
         <h1>${s.display_name || '(이름 없음)'} <small class="muted">${s.login_id}${s.grade ? ` · ${s.grade}학년` : ''}</small></h1>
         <${XPBar} xp=${s.xp} />
-        <div class="hero-stats"><span class="pill">🔥 ${s.streak}일 연속</span><span class="pill">푼 문제 ${attempts.length}</span><span class="pill warn">지금 틀린 문제 ${wrongNow.length}</span></div>
+        <div class="hero-stats"><span class="pill coin">🪙 ${s.coins ?? 0}</span><span class="pill">🔥 ${s.streak}일 연속</span><span class="pill">푼 문제 ${attempts.length}</span><span class="pill warn">지금 틀린 문제 ${wrongNow.length}</span></div>
       </div>
     </section>
+
+    <div class="card"><${GiveCoins} student=${s} onDone=${() => setReload(reload + 1)} /></div>
 
     <h2>📚 수업별 기록</h2>
     <div class="card"><table class="table">

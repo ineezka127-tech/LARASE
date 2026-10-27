@@ -2,6 +2,7 @@ import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { Loading, ErrorBox, toast, fmtDate } from '../components/ui.js';
 import { RichText } from '../components/math.js';
+import { AvatarImg } from '../components/avatar-ui.js';
 
 function highlight(text, keywords) {
   if (!keywords?.length) return text;
@@ -28,7 +29,7 @@ function GradeCard({ a, student, onDone }) {
   };
 
   return html`<div class="card grade-card">
-    <div class="gc-head"><span class="sc-avatar">${student?.avatar}</span><b>${student?.display_name || student?.login_id}</b>
+    <div class="gc-head"><${AvatarImg} cfg=${student?.avatar_cfg} size=${40} /><b>${student?.display_name || student?.login_id}</b>
       <span class="muted small">${a.lessons?.title} · ${fmtDate(a.created_at)}</span>
       ${a.graded_at && html`<span class="pill">${a.score === 2 ? '🌟 정답' : a.score === 1 ? '👍 부분' : '💪 다시'}</span>`}</div>
     <div class="gc-q">Q. <${RichText} text=${q.prompt} /></div>
@@ -54,7 +55,7 @@ export function GradingPage() {
     try {
       let query = sb.from('attempts').select('*, questions!inner(prompt,type,data), lessons(title)').eq('questions.type', 'essay').order('created_at', { ascending: false });
       query = showDone ? query.not('graded_at', 'is', null).limit(50) : query.is('graded_at', null);
-      const [a, p] = await Promise.all([query, sb.from('profiles').select('id,display_name,login_id,avatar')]);
+      const [a, p] = await Promise.all([query, sb.from('profiles').select('id,display_name,login_id,avatar_cfg')]);
       if (a.error || p.error) throw a.error || p.error;
       setStudents(Object.fromEntries(p.data.map((s) => [s.id, s])));
       setList(a.data);

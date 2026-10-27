@@ -1,6 +1,7 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, createAccount, friendlyError, normalizeLoginId } from '../lib/sb.js';
 import { Loading, ErrorBox, toast } from '../components/ui.js';
+import { AvatarImg } from '../components/avatar-ui.js';
 
 export function StudentsPage() {
   const [list, setList] = useState(null);
@@ -53,13 +54,13 @@ export function StudentsPage() {
     <h1>👥 학생 관리</h1>
     <div class="card">
       <table class="table">
-        <tr><th></th><th>아이디</th><th>화면 이름</th><th>학년</th><th>레벨</th><th>XP</th><th></th></tr>
+        <tr><th></th><th>아이디</th><th>화면 이름</th><th>학년</th><th>레벨</th><th>XP</th><th>코인</th><th></th></tr>
         ${list.map((s) => html`<tr>
-          <td class="big-emoji">${s.avatar}</td><td><b>${s.login_id}</b></td><td>${s.display_name || html`<span class="muted">(아직 안 정함)</span>`}</td>
+          <td><${AvatarImg} cfg=${s.avatar_cfg} size=${44} /></td><td><b>${s.login_id}</b></td><td>${s.display_name || html`<span class="muted">(아직 안 정함)</span>`}</td>
           <td><select class="input" value=${s.grade || ''} onChange=${(e) => setGrade(s, Number(e.target.value))}>
             <option value="">-</option>${[1, 2, 3].map((g) => html`<option value=${g}>${g}학년</option>`)}</select></td>
-          <td>Lv.${s.level}</td><td>${s.xp}</td>
-          <td class="right"><a class="btn small" href=${'#/t/student/' + s.id}>기록</a> <button class="btn small ghost" onClick=${() => clearName(s)}>이름 초기화</button></td>
+          <td>Lv.${s.level}</td><td>${s.xp}</td><td>🪙 ${s.coins ?? 0}</td>
+          <td class="right"><a class="btn small" href=${'#/t/student/' + s.id}>기록·🎁코인</a> <button class="btn small ghost" onClick=${() => clearName(s)}>이름 초기화</button></td>
         </tr>`)}
       </table>
       ${list.length === 0 && html`<p class="muted">아직 학생 계정이 없어요. 아래에서 만들어 주세요.</p>`}
