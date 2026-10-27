@@ -1,6 +1,7 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { Loading, ErrorBox, toast, fmtDate } from '../components/ui.js';
+import { RichText } from '../components/math.js';
 
 function highlight(text, keywords) {
   if (!keywords?.length) return text;
@@ -30,7 +31,7 @@ function GradeCard({ a, student, onDone }) {
     <div class="gc-head"><span class="sc-avatar">${student?.avatar}</span><b>${student?.display_name || student?.login_id}</b>
       <span class="muted small">${a.lessons?.title} · ${fmtDate(a.created_at)}</span>
       ${a.graded_at && html`<span class="pill">${a.score === 2 ? '🌟 정답' : a.score === 1 ? '👍 부분' : '💪 다시'}</span>`}</div>
-    <div class="gc-q">Q. ${q.prompt}</div>
+    <div class="gc-q">Q. <${RichText} text=${q.prompt} /></div>
     <div class="gc-answer">${highlight(a.answer, kws)}</div>
     <div class="muted small">예시 답안: ${q.data?.model_answer || '-'}</div>
     ${kws.length > 0 && html`<div class="small">핵심 낱말 ${hit.length}/${kws.length}: ${kws.map((k) => html`<span class=${'pill ' + (hit.includes(k) ? 'good' : '')}>${k}</span>`)}</div>`}

@@ -4,6 +4,7 @@ import { sb, friendlyError } from '../lib/sb.js';
 import { signedUrls } from '../lib/files.js';
 import { answerText, TYPES, DIFFICULTY } from '../lib/questions.js';
 import { Loading, ErrorBox, SpeakBtn, shuffle } from '../components/ui.js';
+import { RichText } from '../components/math.js';
 
 const NUMS = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
 
@@ -63,23 +64,24 @@ export function ClassMode({ lessonId }) {
 
   let body;
   if (s.kind === 'title') body = html`<div class="cm-center"><div class="cm-meta">${lesson.subject} ${lesson.unit}</div><h1 class="cm-title">${lesson.title}</h1><div class="cm-sub">오늘 배운 내용을 정리해 봐요 ✨</div></div>`;
-  else if (s.kind === 'summary') body = html`<div class="cm-text"><h2>📝 오늘 배운 내용</h2>${lesson.summary.split('\n').filter(Boolean).map((p) => html`<p>${p}</p>`)}</div>`;
-  else if (s.kind === 'points') body = html`<div class="cm-text"><h2>⭐ 꼭 기억해요</h2><ol>${lesson.key_points.map((k) => html`<li>${k}</li>`)}</ol></div>`;
+  else if (s.kind === 'summary') body = html`<div class="cm-text"><h2>📝 오늘 배운 내용</h2>${lesson.summary.split('\n').filter(Boolean).map((p) => html`<p><${RichText} text=${p} /></p>`)}</div>`;
+  else if (s.kind === 'points') body = html`<div class="cm-text"><h2>⭐ 꼭 기억해요</h2><ol>${lesson.key_points.map((k) => html`<li><${RichText} text=${k} /></li>`)}</ol></div>`;
   else if (s.kind === 'page') body = html`<img class="cm-img" src=${s.url} />`;
-  else if (s.kind === 'card') body = html`<div class="cm-center" onClick=${() => setReveal(!reveal)}><div class="cm-word">${s.c.front}</div>
-    ${reveal ? html`<div class="cm-sub">${s.c.back}</div>` : html`<div class="cm-hint">무슨 뜻일까요? 🤔</div>`}</div>`;
+  else if (s.kind === 'card') body = html`<div class="cm-center" onClick=${() => setReveal(!reveal)}><div class="cm-word"><${RichText} text=${s.c.front} /></div>
+    ${reveal ? html`<div class="cm-sub"><${RichText} text=${s.c.back} /></div>` : html`<div class="cm-hint">무슨 뜻일까요? 🤔</div>`}</div>`;
   else if (s.kind === 'q') {
     const q = s.q;
     body = html`<div class="cm-q">
       <div class="cm-meta">문제 ${s.n} · ${TYPES[q.type].label} · ${DIFFICULTY[q.difficulty]}</div>
-      <div class="cm-prompt">${q.prompt}</div>
+      <div class="cm-prompt"><${RichText} text=${q.prompt} /></div>
       ${q.type === 'ox' && html`<div class="cm-ox"><span class=${reveal && q.data.answer ? 'on' : ''}>O</span><span class=${reveal && !q.data.answer ? 'on' : ''}>X</span></div>`}
-      ${q.type === 'mcq' && html`<div class="cm-choices">${q.data.choices.map((c, k) => html`<div class=${'cm-choice' + (reveal && k + 1 === q.data.answer ? ' on' : '')}>${NUMS[k]} ${c}</div>`)}</div>`}
+      ${q.type === 'mcq' && html`<div class="cm-choices">${q.data.choices.map((c, k) => html`<div class=${'cm-choice' + (reveal && k + 1 === q.data.answer ? ' on' : '')}>${NUMS[k]} <${RichText} text=${c} /></div>`)}</div>`}
       ${q.type === 'match' && !reveal && html`<div class="cm-two"><div>${q.data.pairs.map((p) => html`<div class="cm-chip">${p[0]}</div>`)}</div>
         <div>${s.mix.map((r) => html`<div class="cm-chip">${r}</div>`)}</div></div>`}
+      ${q.type === 'frac' && !reveal && html`<div class="cm-hint">${({ mixed: '대분수로', improper: '가분수로' })[q.data.form] || ''} 답해 보세요 ✍️</div>`}
       ${q.type === 'order' && !reveal && html`<div class="cm-chips">${s.mix.map((r) => html`<span class="cm-chip">${r}</span>`)}</div>`}
-      ${reveal && q.type !== 'mcq' && q.type !== 'ox' && html`<div class="cm-answer">${answerText(q).split('\n').map((t) => html`<div>${t}</div>`)}</div>`}
-      ${reveal && q.data.explanation && html`<div class="cm-explain">💡 ${q.data.explanation}</div>`}
+      ${reveal && q.type !== 'mcq' && q.type !== 'ox' && html`<div class="cm-answer">${answerText(q).split('\n').map((t) => html`<div><${RichText} text=${t} /></div>`)}</div>`}
+      ${reveal && q.data.explanation && html`<div class="cm-explain">💡 <${RichText} text=${q.data.explanation} /></div>`}
     </div>`;
   } else body = html`<div class="cm-center"><div class="cm-word">🎉</div><h1 class="cm-title">오늘도 수고했어요!</h1><div class="cm-sub">태블릿에서 퀴즈를 풀고 경험치를 모아 봐요</div></div>`;
 

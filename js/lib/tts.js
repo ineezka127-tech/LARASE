@@ -1,4 +1,6 @@
 // 읽어 주기 (태블릿의 한국어 음성 사용)
+import { speakFractions } from './fraction.js';
+
 let koVoice = null;
 
 function pickVoice() {
@@ -16,7 +18,7 @@ export const ttsSupported = 'speechSynthesis' in window;
 export function speak(text, { rate = 0.9 } = {}) {
   if (!ttsSupported || !text) return;
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(String(text).replace(/[_]{2,}/g, '빈칸'));
+  const u = new SpeechSynthesisUtterance(speakFractions(text).replace(/[_]{2,}/g, '빈칸'));
   u.lang = 'ko-KR';
   u.rate = rate;
   if (koVoice) u.voice = koVoice;

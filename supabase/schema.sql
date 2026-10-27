@@ -60,12 +60,17 @@ create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
   lesson_id uuid not null references public.lessons on delete cascade,
   position int not null default 0,
-  type text not null check (type in ('ox', 'mcq', 'short', 'match', 'order', 'essay')),
+  type text not null check (type in ('ox', 'mcq', 'short', 'match', 'order', 'essay', 'frac')),
   difficulty int not null default 2 check (difficulty between 1 and 3),
   prompt text not null,
   data jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
+
+-- 이미 만들어진 표에도 새 문제 유형(분수 답) 허용
+alter table public.questions drop constraint if exists questions_type_check;
+alter table public.questions add constraint questions_type_check
+  check (type in ('ox', 'mcq', 'short', 'match', 'order', 'essay', 'frac'));
 
 create table if not exists public.attempts (
   id bigint generated always as identity primary key,

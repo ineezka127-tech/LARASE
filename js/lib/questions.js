@@ -1,4 +1,6 @@
 // 문제 유형, 채점, AI 결과 가져오기
+import { checkFraction, fracToken, parseFraction, isComplete } from './fraction.js';
+
 export const TYPES = {
   ox: { label: 'O/X', icon: '⭕' },
   mcq: { label: '5지선다', icon: '🔢' },
@@ -6,6 +8,14 @@ export const TYPES = {
   match: { label: '짝 맞추기', icon: '🔗' },
   order: { label: '순서 맞추기', icon: '🔀' },
   essay: { label: '서술형', icon: '📝' },
+  frac: { label: '분수·수 답', icon: '➗' },
+};
+
+export const FRAC_FORMS = {
+  any: '값만 맞으면 정답',
+  mixed: '대분수로 써야 정답',
+  improper: '가분수로 써야 정답',
+  exact: '정답과 똑같은 모양이어야 정답',
 };
 
 export const DIFFICULTY = { 1: '쉬움', 2: '보통', 3: '도전' };
@@ -22,6 +32,7 @@ export function checkAnswer(q, answer) {
     case 'match': return (d.pairs || []).every((p, i) => answer?.[i] === p[1]);
     case 'order': return (d.items || []).every((it, i) => answer?.[i] === it);
     case 'essay': return null;
+    case 'frac': return checkFraction(d, answer).correct;
     default: return false;
   }
 }
@@ -36,6 +47,7 @@ export function answerText(q) {
     case 'match': return (d.pairs || []).map((p) => `${p[0]} → ${p[1]}`).join('\n');
     case 'order': return (d.items || []).map((it, i) => `${i + 1}. ${it}`).join('\n');
     case 'essay': return d.model_answer || '';
+    case 'frac': return fracToken(d.answer || {});
     default: return '';
   }
 }
@@ -48,6 +60,7 @@ export function emptyQuestion(type = 'mcq') {
   if (type === 'match') base.data = { pairs: [['', ''], ['', ''], ['', '']] };
   if (type === 'order') base.data = { items: ['', '', ''] };
   if (type === 'essay') base.data = { model_answer: '', keywords: [] };
+  if (type === 'frac') base.data = { answer: { w: null, n: 1, d: 2 }, form: 'any', lowest: false, explanation: '' };
   if (type === 'ox' || type === 'match') base.difficulty = 1;
   if (type === 'essay') base.difficulty = 3;
   return base;
@@ -91,6 +104,11 @@ export function normalizeQuestion(raw) {
     if (items.length < 2) throw new Error('순서 항목이 2개 이상 필요해요');
     if (new Set(items).size !== items.length) throw new Error('순서 항목이 서로 달라야 해요');
     data = { items, explanation };
+  } else if (type === 'frac') {
+    const answer = parseFraction(raw.answer);
+    if (!answer || !isComplete(answer)) throw new Error('분수 정답 형식이 올바르지 않아요 (예: "2 1/3", "7/3")');
+    const form = FRAC_FORMS[raw.form] ? raw.form : 'any';
+    data = { answer, form, lowest: !!raw.lowest, explanation };
   } else {
     data = { model_answer: str(raw.model_answer || raw.answer), keywords: (raw.keywords || []).map(str).filter(Boolean) };
   }
@@ -114,6 +132,7 @@ export function validateQuestion(q) {
     if ((d.items || []).length < 2) return '순서 항목을 2개 이상 써 주세요';
     if (new Set(d.items).size !== d.items.length) return '순서 항목이 서로 달라야 해요';
   }
+  if (q.type === 'frac' && !isComplete(d.answer)) return '분수 정답을 써 주세요 (분자와 분모, 또는 자연수만)';
   return null;
 }
 
@@ -171,6 +190,7 @@ export const AI_PROMPT = `너는 특수학급 선생님을 돕는 복습 자료 
    - match 1개 (짝 맞추기, 3~5쌍, difficulty 1)
    - order 1개 (순서 맞추기, 3~5단계, difficulty 2) — 순서가 분명한 내용이 없으면 생략
    - essay 1~2개 (서술형, 2~3문장으로 답하는 문제, difficulty 3)
+   - 수학 수업이면: 답이 분수나 수인 계산 문제는 frac 유형으로 4~6개 더 만들고, 위 구성에서 short·essay를 줄여도 됨
 
 [규칙]
 - 자료에 있는 내용으로만 만들 것. 자료에 없는 내용은 지어내지 말 것
@@ -180,6 +200,9 @@ export const AI_PROMPT = `너는 특수학급 선생님을 돕는 복습 자료 
 - short의 answers에는 정답으로 인정할 표현을 모두 넣을 것 (예: ["광합성", "광합성 작용"])
 - match의 pairs는 [왼쪽, 오른쪽] 순서, 오른쪽 낱말끼리 겹치지 않게
 - order의 items는 올바른 순서대로 적을 것
+- frac의 answer는 "2 1/3"(대분수), "7/3"(가분수·진분수), "4"(자연수)처럼 문자열로 쓸 것
+- frac의 form: 대분수로 답해야 하면 "mixed", 가분수로 답해야 하면 "improper", 상관없으면 "any". 기약분수로만 답해야 하면 "lowest": true
+- 문제·보기·해설 속 분수는 {7/3}, 대분수는 {2 1/3}처럼 중괄호로 감싸서 쓸 것 (화면에 분수 모양으로 보여요)
 - explanation은 왜 그 답인지 1~2문장으로 쉽게
 - 반드시 아래 형식의 JSON 하나만 코드 블록으로 출력할 것
 
@@ -197,7 +220,8 @@ export const AI_PROMPT = `너는 특수학급 선생님을 돕는 복습 자료 
     {"type": "short", "difficulty": 2, "prompt": "문제", "answers": ["정답", "다른 표현"], "explanation": "해설"},
     {"type": "match", "difficulty": 1, "prompt": "알맞은 것끼리 연결하세요", "pairs": [["왼쪽1", "오른쪽1"], ["왼쪽2", "오른쪽2"], ["왼쪽3", "오른쪽3"]]},
     {"type": "order", "difficulty": 2, "prompt": "순서대로 놓으세요", "items": ["1단계", "2단계", "3단계"]},
-    {"type": "essay", "difficulty": 3, "prompt": "문제", "model_answer": "예시 답안", "keywords": ["채점할 때 볼 핵심 낱말"]}
+    {"type": "essay", "difficulty": 3, "prompt": "문제", "model_answer": "예시 답안", "keywords": ["채점할 때 볼 핵심 낱말"]},
+    {"type": "frac", "difficulty": 2, "prompt": "{7/3}을 대분수로 나타내세요.", "answer": "2 1/3", "form": "mixed", "lowest": false, "explanation": "7÷3은 몫이 2, 나머지가 1이라서 {2 1/3}이에요."}
   ]
 }
 \`\`\``;

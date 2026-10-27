@@ -3,6 +3,7 @@ import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { signedUrls } from '../lib/files.js';
 import { DIFFICULTY } from '../lib/questions.js';
 import { Loading, ErrorBox, SpeakBtn, Modal, reward, fmtDate } from '../components/ui.js';
+import { RichText } from '../components/math.js';
 
 export function Flashcards({ cards }) {
   const [i, setI] = useState(0);
@@ -13,8 +14,8 @@ export function Flashcards({ cards }) {
   return html`<div class="flash-wrap">
     <div class=${'flashcard' + (flip ? ' flipped' : '')} onClick=${() => setFlip(!flip)}>
       <div class="flash-inner">
-        <div class="flash-face front"><div class="flash-text">${c.front}</div><small>눌러서 뜻 보기 👆</small></div>
-        <div class="flash-face back"><div class="flash-text sm">${c.back}</div><small>${c.front}</small></div>
+        <div class="flash-face front"><div class="flash-text"><${RichText} text=${c.front} /></div><small>눌러서 뜻 보기 👆</small></div>
+        <div class="flash-face back"><div class="flash-text sm"><${RichText} text=${c.back} /></div><small>${c.front}</small></div>
       </div>
     </div>
     <div class="flash-nav">
@@ -87,12 +88,12 @@ export function LessonView({ lessonId, profile }) {
 
     ${tab === 'summary' && html`<div class="card reading">
       <div class="reading-tools"><${SpeakBtn} text=${lesson.summary} label="읽어 주기" /></div>
-      ${(lesson.summary || '요약이 아직 없어요.').split('\n').filter(Boolean).map((p) => html`<p>${p}</p>`)}
+      ${(lesson.summary || '요약이 아직 없어요.').split('\n').filter(Boolean).map((p) => html`<p><${RichText} text=${p} /></p>`)}
     </div>`}
     ${tab === 'points' && html`<div class="card reading">
       <div class="reading-tools"><${SpeakBtn} text=${keyText} label="읽어 주기" /></div>
       ${lesson.key_points.length === 0 && html`<p class="muted">핵심 정리가 아직 없어요.</p>`}
-      <ol class="key-points">${lesson.key_points.map((k) => html`<li><span>${k}</span> <${SpeakBtn} text=${k} /></li>`)}</ol>
+      <ol class="key-points">${lesson.key_points.map((k) => html`<li><span><${RichText} text=${k} /></span> <${SpeakBtn} text=${k} /></li>`)}</ol>
     </div>`}
     ${tab === 'cards' && html`<${Flashcards} cards=${lesson.flashcards} />`}
     ${tab === 'pages' && html`<${PageImages} paths=${lesson.pages} />`}

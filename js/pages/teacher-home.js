@@ -2,6 +2,8 @@ import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
 import { answerText, TYPES } from '../lib/questions.js';
 import { Loading, ErrorBox, XPBar, fmtDate, timeAgo } from '../components/ui.js';
+import { RichText } from '../components/math.js';
+import { fracToken } from '../lib/fraction.js';
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
 
@@ -131,10 +133,10 @@ export function StudentDetail({ studentId }) {
     ${wrongNow.length === 0 && html`<div class="card empty">없어요! 👍</div>`}
     <div class="list">${wrongNow.map((a) => html`<div class="card">
       <div class="muted small">${TYPES[a.questions?.type]?.label} · ${fmtDate(a.created_at)}</div>
-      <b>${a.questions?.prompt}</b>
+      <b><${RichText} text=${a.questions?.prompt} /></b>
       <div class="two-col small">
-        <div>학생 답: <span class="bad-text">${fmtAnswer(a.answer, a.questions)}</span></div>
-        <div>정답: <span class="good-text">${a.questions ? answerText(a.questions) : ''}</span></div>
+        <div>학생 답: <span class="bad-text"><${RichText} text=${fmtAnswer(a.answer, a.questions)} /></span></div>
+        <div>정답: <span class="good-text"><${RichText} text=${a.questions ? answerText(a.questions) : ''} /></span></div>
       </div>
     </div>`)}</div>
   </div>`;
@@ -143,6 +145,7 @@ export function StudentDetail({ studentId }) {
 export function fmtAnswer(ans, q) {
   if (ans == null) return '';
   if (q?.type === 'ox') return ans ? 'O' : 'X';
+  if (q?.type === 'frac') return fracToken(ans);
   if (q?.type === 'mcq') return `${ans}번 ${q.data?.choices?.[ans - 1] ?? ''}`;
   if (Array.isArray(ans)) {
     if (q?.type === 'match') return q.data.pairs.map((p, i) => `${p[0]}→${ans[i]}`).join(', ');

@@ -397,3 +397,51 @@ input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; accent-
   .ox-btn { height: 120px; font-size: 3.5em; }
   .match { gap: 8px; }
 }
+
+/* ---------- 분수 ---------- */
+.frac { display: inline-flex; align-items: center; gap: 0.15em; vertical-align: middle; margin: 0 0.1em; }
+.frac-w { font-size: 1.15em; font-weight: 700; }
+.frac-nd { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 0.85em; }
+.frac-n { padding: 0 0.2em; border-bottom: 2px solid currentColor; }
+.frac-d { padding: 0 0.2em; }
+.q-prompt .frac-nd, .cm-prompt .frac-nd { font-size: 0.8em; }
+
+.frac-q { display: flex; flex-direction: column; gap: 14px; }
+.frac-input { display: flex; flex-direction: column; gap: 14px; }
+.fi-display { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 10px; }
+.fi-nd { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.fi-bar { width: 130px; height: 5px; border-radius: 3px; background: var(--ink); }
+.fi-slot { width: 110px; height: 84px; border: 3px dashed var(--line); border-radius: 16px; background: #fff; font: inherit; font-size: 2.4em; font-weight: 800; color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
+.fi-slot small { font-size: 0.32em; font-weight: 600; color: var(--muted); text-align: center; }
+.fi-slot.whole { width: 110px; height: 120px; }
+.fi-slot.on { border-style: solid; border-color: var(--primary); box-shadow: 0 0 0 5px var(--primary-soft); }
+.fi-slot:disabled { cursor: default; }
+.frac-input.right .fi-slot { border-color: var(--good); background: var(--good-soft); border-style: solid; }
+.frac-input.wrong .fi-slot { border-color: var(--bad); background: var(--bad-soft); border-style: solid; }
+.fi-panel { background: var(--bg); border-radius: 18px; padding: 12px; }
+.fi-tabs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.fi-tabs .tab { padding: 8px 14px; }
+.fi-now { margin-right: auto; font-size: 0.95em; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 420px; margin: 0 auto; }
+.key { height: 64px; border: 2px solid var(--line); border-radius: 14px; background: #fff; font: inherit; font-size: 1.6em; font-weight: 800; cursor: pointer; color: var(--ink); }
+.key.fn { font-size: 1em; color: var(--muted); }
+.key:active { transform: scale(0.96); background: var(--primary-soft); }
+.penpad-wrap { position: relative; }
+.penpad { display: block; width: 100%; height: 220px; background: #fff; border: 3px solid var(--line); border-radius: 16px; touch-action: none; cursor: crosshair;
+  background-image: linear-gradient(transparent calc(50% - 1px), #eef0fb calc(50% - 1px), #eef0fb calc(50% + 1px), transparent calc(50% + 1px)); }
+.penpad-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--muted); pointer-events: none; font-weight: 600; }
+.penpad-clear { position: absolute; top: 8px; right: 8px; }
+.pen-result { margin-top: 10px; background: var(--good-soft); border-radius: 12px; padding: 10px 14px; }
+.pen-result.unsure { background: var(--warn-soft); }
+.pen-read { font-size: 1.6em; margin: 0 4px; }
+.pen-alts { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+.pen-alt-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pen-alt-row .chip { font-size: 1.3em; padding: 4px 18px; }
+.center-row { justify-content: center; }
+.fb-hint { margin: 8px 0; padding: 8px 12px; background: var(--warn-soft); border-radius: 12px; font-weight: 700; color: #8a4b00; }
+.frac-edit { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.frac-edit > div:first-child { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.num-in { width: 6em; }
+.frac-edit-nd { display: inline-flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--line); padding-left: 8px; }
+@media (max-width: 600px) { .fi-slot { width: 84px; height: 70px; font-size: 1.9em; } .fi-slot.whole { width: 84px; height: 100px; } .fi-bar { width: 100px; } }
+.fi-sub { font-size: 0.8em; font-weight: 400; white-space: nowrap; }

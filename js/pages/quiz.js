@@ -3,6 +3,8 @@ import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { checkAnswer, answerText, TYPES, DIFFICULTY } from '../lib/questions.js';
 import { speak, stopSpeaking, getAutoRead, setAutoRead, ttsSupported } from '../lib/tts.js';
 import { Loading, ErrorBox, SpeakBtn, reward, shuffle, toast } from '../components/ui.js';
+import { RichText, FractionInput } from '../components/math.js';
+import { checkFraction, isComplete } from '../lib/fraction.js';
 
 const NUMS = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
 
@@ -25,7 +27,7 @@ function MCQ({ q, done, answer, onAnswer }) {
     if (done && n === q.data.answer) cls += ' right';
     else if (done && n === answer) cls += ' wrong';
     return html`<div class="choice-row">
-      <button class=${cls} disabled=${done} onClick=${() => onAnswer(n)}><span class="num">${NUMS[i]}</span><span>${c}</span></button>
+      <button class=${cls} disabled=${done} onClick=${() => onAnswer(n)}><span class="num">${NUMS[i]}</span><span><${RichText} text=${c} /></span></button>
       <${SpeakBtn} text=${`${n}번, ${c}`} />
     </div>`;
   })}</div>`;
@@ -115,7 +117,17 @@ function Order({ q, done, answer, onAnswer }) {
   </div>`;
 }
 
-const VIEWS = { ox: OX, mcq: MCQ, short: Short, essay: Essay, match: Match, order: Order };
+function FracAnswer({ q, done, answer, onAnswer }) {
+  const [v, setV] = useState({ w: '', n: '', d: '' });
+  const cur = done ? answer : v;
+  const ok = done && checkFraction(q.data, answer).correct;
+  return html`<div class="frac-q">
+    <${FractionInput} value=${cur} onChange=${setV} disabled=${done} resultClass=${done ? (ok ? 'right' : 'wrong') : ''} />
+    ${!done && html`<button class="btn big primary block" disabled=${!isComplete(v)} onClick=${() => onAnswer(v)}>확인 ✔</button>`}
+  </div>`;
+}
+
+const VIEWS = { ox: OX, mcq: MCQ, short: Short, essay: Essay, match: Match, order: Order, frac: FracAnswer };
 
 // ---------- 퀴즈 진행 ----------
 export function QuizPage({ lessonId, profile, query }) {
@@ -178,7 +190,7 @@ export function QuizPage({ lessonId, profile, query }) {
       toast('⚠️ 기록 저장 실패: ' + friendlyError(e));
     }
     if (correct === true) speak('정답이에요!');
-    setResult({ correct, xp });
+    setResult({ correct, xp, hint: q.type === 'frac' ? checkFraction(q.data, ans).hint : '' });
     setResults([...results, { q, correct }]);
     setBusy(false);
   };
@@ -238,7 +250,7 @@ export function QuizPage({ lessonId, profile, query }) {
     })}</div>
     <div class="card question" key=${q.id + round}>
       <div class="q-meta"><span class="pill">${TYPES[q.type].icon} ${TYPES[q.type].label}</span><span class=${'pill d' + q.difficulty}>${DIFFICULTY[q.difficulty]}</span><span class="muted">${idx + 1} / ${list.length}</span></div>
-      <div class="q-prompt">${q.prompt} <${SpeakBtn} text=${q.prompt} /></div>
+      <div class="q-prompt"><${RichText} text=${q.prompt} /> <${SpeakBtn} text=${q.prompt} /></div>
       <${View} q=${q} done=${done} answer=${answer} onAnswer=${submit} />
     </div>
 
@@ -247,9 +259,10 @@ export function QuizPage({ lessonId, profile, query }) {
         ${result.correct === true ? '🎉 정답이에요!' : result.correct === false ? '🤔 아쉬워요!' : '📮 제출했어요! 선생님이 확인할 거예요.'}
         ${result.xp > 0 && html`<span class="xp-pop">+${result.xp} XP</span>`}
       </div>
-      ${result.correct === false && q.type !== 'match' && q.type !== 'order' && html`<div class="fb-answer">정답: <b>${answerText(q)}</b></div>`}
+      ${result.hint && html`<div class="fb-hint">💡 ${result.hint}</div>`}
+      ${result.correct === false && q.type !== 'match' && q.type !== 'order' && html`<div class="fb-answer">정답: <b><${RichText} text=${answerText(q)} /></b></div>`}
       ${result.correct === null && q.data.model_answer && html`<div class="fb-answer"><b>예시 답안</b><br/>${q.data.model_answer}</div>`}
-      ${q.data.explanation && html`<div class="fb-explain">💡 ${q.data.explanation} <${SpeakBtn} text=${q.data.explanation} /></div>`}
+      ${q.data.explanation && html`<div class="fb-explain">📘 <${RichText} text=${q.data.explanation} /> <${SpeakBtn} text=${q.data.explanation} /></div>`}
       <button class="btn huge primary block" onClick=${next}>${idx + 1 < list.length ? '다음 문제 ▶' : '결과 보기 🏁'}</button>
     </div>`}
   </div>`;

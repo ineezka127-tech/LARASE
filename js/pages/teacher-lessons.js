@@ -1,6 +1,8 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
-import { TYPES, DIFFICULTY, emptyQuestion, parseAIResult, validateQuestion, AI_PROMPT } from '../lib/questions.js';
+import { TYPES, DIFFICULTY, FRAC_FORMS, emptyQuestion, parseAIResult, validateQuestion, AI_PROMPT } from '../lib/questions.js';
+import { fracToken } from '../lib/fraction.js';
+import { RichText } from '../components/math.js';
 import { imageToJpeg, pdfPageCount, pdfToJpegs, uploadJpeg, removeFiles, signedUrls, parsePageRange } from '../lib/files.js';
 import { Loading, ErrorBox, Modal, toast, fmtDate, go } from '../components/ui.js';
 
@@ -104,6 +106,24 @@ function QuestionEditor({ q, index, total, onChange, onMove, onDelete, error }) 
 
     ${q.type === 'essay' && html`<label>예시 답안<textarea class="input" rows="2" value=${d.model_answer} onInput=${(e) => setData({ model_answer: e.target.value })}></textarea></label>
       <label>채점 핵심 낱말 (쉼표로 구분)<input class="input" value=${(d.keywords || []).join(', ')} onChange=${(e) => setData({ keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} /></label>`}
+
+    ${q.type === 'frac' && html`<div class="frac-edit">
+      <div>정답:
+        <input class="input num-in" inputmode="numeric" placeholder="자연수" value=${d.answer?.w ?? ''} onInput=${(e) => setData({ answer: { ...d.answer, w: e.target.value === '' ? null : Number(e.target.value) } })} />
+        <span class="frac-edit-nd">
+          <input class="input num-in" inputmode="numeric" placeholder="분자" value=${d.answer?.n ?? ''} onInput=${(e) => setData({ answer: { ...d.answer, n: e.target.value === '' ? null : Number(e.target.value) } })} />
+          <input class="input num-in" inputmode="numeric" placeholder="분모" value=${d.answer?.d ?? ''} onInput=${(e) => setData({ answer: { ...d.answer, d: e.target.value === '' ? null : Number(e.target.value) } })} />
+        </span>
+        <span class="muted small">→ <${RichText} text=${fracToken(d.answer || {})} /></span>
+      </div>
+      <div class="btn-row">
+        <select class="input" value=${d.form || 'any'} onChange=${(e) => setData({ form: e.target.value })}>
+          ${Object.entries(FRAC_FORMS).map(([k, label]) => html`<option value=${k}>${label}</option>`)}
+        </select>
+        <label class="check"><input type="checkbox" checked=${!!d.lowest} onChange=${(e) => setData({ lowest: e.target.checked })} /> 기약분수만 정답</label>
+      </div>
+      <div class="muted small">💡 문제 글에 분수를 쓸 때는 {7/3}, 대분수는 {2 1/3}처럼 중괄호로 감싸면 분수 모양으로 보여요.</div>
+    </div>`}
 
     ${q.type !== 'essay' && html`<label>해설 (선택)<input class="input" value=${d.explanation || ''} onInput=${(e) => setData({ explanation: e.target.value })} /></label>`}
   </div>`;
