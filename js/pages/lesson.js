@@ -1,7 +1,7 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { signedUrls } from '../lib/files.js';
-import { DIFFICULTY } from '../lib/questions.js';
+import { DIFFICULTY, tierOf } from '../lib/questions.js';
 import { Loading, ErrorBox, SpeakBtn, Modal, reward, fmtDate } from '../components/ui.js';
 import { RichText } from '../components/math.js';
 
@@ -54,7 +54,7 @@ export function LessonView({ lessonId, profile }) {
     (async () => {
       const [l, q] = await Promise.all([
         sb.from('lessons').select('*').eq('id', lessonId).maybeSingle(),
-        sb.from('questions').select('id,difficulty').eq('lesson_id', lessonId),
+        sb.from('questions').select('id,difficulty,tier').eq('lesson_id', lessonId),
       ]);
       if (l.error || q.error) throw l.error || q.error;
       if (!l.data) throw new Error('수업을 찾을 수 없어요.');
@@ -74,8 +74,10 @@ export function LessonView({ lessonId, profile }) {
     ['cards', '🃏 낱말 카드'],
     ['pages', '🖼️ 판서'],
   ];
-  const counts = { 1: 0, 2: 0, 3: 0 };
-  qs.forEach((q) => { counts[q.difficulty] += 1; });
+  const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const myTier = tierOf(profile);
+  const mineQs = qs.filter((q) => profile?.role === 'teacher' || !q.tier || q.tier === myTier);
+  (mineQs.length ? mineQs : qs).forEach((q) => { counts[q.difficulty] = (counts[q.difficulty] || 0) + 1; });
   const keyText = lesson.key_points.map((k, i) => `${i + 1}. ${k}`).join('\n');
 
   return html`<div class="page">
@@ -105,9 +107,9 @@ export function LessonView({ lessonId, profile }) {
     ${pick && html`<${Modal} onClose=${() => setPick(false)}>
       <h2>어떤 문제를 풀까요?</h2>
       <div class="pick-list">
-        <a class="btn big primary block" href=${'#/quiz/' + lessonId}>🌈 전체 문제 (${qs.length})</a>
-        ${[1, 2, 3].filter((d) => counts[d]).map((d) => html`<a class="btn big block" href=${`#/quiz/${lessonId}?d=${d}`}>
-          ${d === 1 ? '🌱' : d === 2 ? '🌿' : '🌳'} ${DIFFICULTY[d]} 문제 (${counts[d]})</a>`)}
+        <a class="btn big primary block" href=${'#/quiz/' + lessonId}>🎯 나에게 맞춰 풀기 <small>(맞히면 점점 어려워져요)</small></a>
+        ${[1, 2, 3, 4].filter((d) => counts[d]).map((d) => html`<a class="btn big block" href=${`#/quiz/${lessonId}?d=${d}`}>
+          ${['', '🌱', '🌿', '🌳', '🏔️'][d]} ${DIFFICULTY[d]} 문제 (${counts[d]})</a>`)}
       </div>
       <button class="btn ghost block" onClick=${() => setPick(false)}>닫기</button>
     <//>`}

@@ -2,7 +2,7 @@
 import { html, useState, useEffect, useRef, useMemo } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { totalStats, avatarSvg } from '../lib/avatar.js';
-import { checkAnswer, answerText } from '../lib/questions.js';
+import { checkAnswer, answerText, tierOf } from '../lib/questions.js';
 import { MAP, TILE, BLOCKING, TILE_INFO, ITEM_INFO, worldInfo, zoneOf, ORDER, makeEnemy, maxHp, playerDamage, blockAmount, enemyDamage, critChance } from '../lib/game.js';
 import { Loading, ErrorBox, Modal, SpeakBtn, reward, toast, shuffle } from '../components/ui.js';
 import { RichText } from '../components/math.js';
@@ -281,13 +281,17 @@ export function GamePage({ profile, refreshProfile }) {
     try {
       const [g, q] = await Promise.all([
         rpc('game_get'),
-        sb.from('questions').select('id,type,prompt,data,difficulty').in('type', ['mcq', 'ox']).limit(800),
+        sb.from('questions').select('*').in('type', ['mcq', 'ox']).limit(800),
       ]);
       if (q.error) throw q.error;
       setSt(g);
       // 친구 위치 (업데이트 7을 안 했으면 그냥 안 보여요)
       rpc('game_others').then((fs) => setFriends((fs || []).map((f) => ({ ...f, uri: toUri(f.avatar_cfg) })))).catch(() => {});
-      setPool(q.data.filter((x) => x.type !== 'mcq' || (x.data.choices || []).length >= 2));
+      // 내 그룹(가/나/다) 문제와 공통 문제를 먼저, 모자라면 전체에서
+      const ok = q.data.filter((x) => x.type !== 'mcq' || (x.data.choices || []).length >= 2);
+      const t = tierOf(profile);
+      const mine = ok.filter((x) => !x.tier || x.tier === t);
+      setPool(mine.filter((x) => x.type === 'mcq').length >= 5 && mine.filter((x) => x.type === 'ox').length >= 3 ? mine : ok);
     } catch (e) { setErr(friendlyError(e)); }
   };
   useEffect(() => { load(); }, []);

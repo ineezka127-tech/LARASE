@@ -18,7 +18,28 @@ export const FRAC_FORMS = {
   exact: '정답과 똑같은 모양이어야 정답',
 };
 
-export const DIFFICULTY = { 1: '쉬움', 2: '보통', 3: '도전' };
+export const DIFFICULTY = { 1: '쉬움', 2: '보통', 3: '어려움', 4: '도전' };
+export const DIFFICULTY_DESC = {
+  1: '자료에 나온 낱말·사실을 그대로 알아보거나 떠올리기',
+  2: '뜻을 이해했는지 확인하기 (다른 말로 바꿔 묻기, 알맞은 예 고르기)',
+  3: '배운 것을 새로운 예시·상황에 적용하기',
+  4: '두 단계 이상 생각하기 (비교·이유·추론) — 그 그룹에서 가장 어려운 문제',
+};
+
+// 🎯 학생 그룹 (가=상, 나=중, 다=하). 그룹마다 쉬움~도전 난이도가 따로 있어요
+export const TIERS = ['가', '나', '다'];
+export const TIER_INFO = {
+  가: { name: '가 그룹 (상)', level: '초등 5~6학년 수준',
+    guide: '핵심 개념을 이해하고 적용·추론하는 문제. 두 단계 생각, 이유 쓰기, 비교하기, 생활 속에 적용하기. 5지선다는 보기 5개',
+    weights: { ox: 1, mcq: 4, short: 3, match: 1, order: 2, essay: 2, frac: 4 } },
+  나: { name: '나 그룹 (중)', level: '초등 3~4학년 수준',
+    guide: '핵심 개념을 이해했는지 묻는 문제. 한 단계 생각, 뜻 고르기, 간단한 적용. 짧은 문장, 5지선다는 보기 4~5개',
+    weights: { ox: 2, mcq: 4, short: 3, match: 2, order: 1, essay: 1, frac: 4 } },
+  다: { name: '다 그룹 (하)', level: '초등 1~2학년 수준',
+    guide: '중요한 낱말·사실을 알아보는 문제. 한 문장은 15자 안팎으로 아주 짧게, 보기는 3개, 떠올리기 쉬운 말, "아닌 것은?" 같은 부정 질문은 쓰지 않기. 단답형은 한 낱말',
+    weights: { ox: 4, mcq: 4, short: 1, match: 3, order: 1, essay: 0, frac: 3 } },
+};
+export const tierOf = (profile) => (TIERS.includes(profile?.tier) ? profile.tier : '나');
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[\s.,!?·'"“”‘’()\-~]/g, '');
 
@@ -53,7 +74,7 @@ export function answerText(q) {
 }
 
 export function emptyQuestion(type = 'mcq') {
-  const base = { id: crypto.randomUUID(), type, difficulty: 2, prompt: '', data: {} };
+  const base = { id: crypto.randomUUID(), type, difficulty: 2, tier: null, prompt: '', data: {} };
   if (type === 'ox') base.data = { answer: true, explanation: '' };
   if (type === 'mcq') base.data = { choices: ['', '', '', '', ''], answer: 1, explanation: '' };
   if (type === 'short') base.data = { answers: [''], explanation: '' };
@@ -72,7 +93,8 @@ export function normalizeQuestion(raw) {
   if (!TYPES[type]) throw new Error(`알 수 없는 문제 유형: ${raw.type}`);
   const prompt = String(raw.prompt || raw.question || '').trim();
   if (!prompt) throw new Error('문제 내용(prompt)이 비어 있어요');
-  const difficulty = [1, 2, 3].includes(Number(raw.difficulty)) ? Number(raw.difficulty) : 2;
+  const difficulty = [1, 2, 3, 4].includes(Number(raw.difficulty)) ? Number(raw.difficulty) : 2;
+  const tier = TIERS.includes(String(raw.tier || raw.group || '').trim()) ? String(raw.tier || raw.group).trim() : null;
   const explanation = String(raw.explanation || '').trim();
   const str = (x) => String(x ?? '').trim();
   let data;
@@ -112,7 +134,7 @@ export function normalizeQuestion(raw) {
   } else {
     data = { model_answer: str(raw.model_answer || raw.answer), keywords: (raw.keywords || []).map(str).filter(Boolean) };
   }
-  return { id: crypto.randomUUID(), type, difficulty, prompt, data };
+  return { id: crypto.randomUUID(), type, difficulty, tier, prompt, data };
 }
 
 // 편집 화면에서 저장 전에 확인 (문제 없으면 null)
@@ -175,12 +197,13 @@ export function parseAIResult(text) {
 export const PROMPT_TYPES = {
   ox: 'O/X', mcq: '5지선다', short: '단답형', match: '짝 맞추기', order: '순서 맞추기', essay: '서술형', frac: '분수·수 답',
 };
+// 난이도 곡선: [쉬움, 보통, 어려움, 도전] 비율(%)
 export const PROMPT_LEVELS = {
-  easy: ['쉬움 위주', [60, 30, 10]],
-  mix: ['골고루', [30, 50, 20]],
-  hard: ['도전 위주', [10, 40, 50]],
+  easy: ['쉬움 위주', [40, 30, 20, 10]],
+  mix: ['골고루', [25, 35, 25, 15]],
+  hard: ['도전 위주', [10, 25, 35, 30]],
 };
-export const DEFAULT_PROMPT_OPTS = { count: 12, level: 'mix', types: ['ox', 'mcq', 'short', 'match', 'order', 'essay'] };
+export const DEFAULT_PROMPT_OPTS = { tiers: { 가: 8, 나: 8, 다: 6 }, level: 'mix', types: ['ox', 'mcq', 'short', 'match', 'order', 'essay'] };
 
 const TYPE_HINT = {
   ox: 'O/X',
@@ -191,30 +214,55 @@ const TYPE_HINT = {
   essay: '서술형, 2~3문장으로 답하는 문제',
   frac: '답이 분수나 수인 계산 문제',
 };
-const TYPE_WEIGHT = { ox: 3, mcq: 4, short: 3, match: 1, order: 1, essay: 1, frac: 4 };
 
-function composition({ count, level, types }) {
-  const list = types.length ? types : DEFAULT_PROMPT_OPTS.types;
-  const total = list.reduce((s, t) => s + TYPE_WEIGHT[t], 0);
-  let left = count;
-  const n = list.map((t, i) => {
-    const v = i === list.length - 1 ? left : Math.max(1, Math.round((count * TYPE_WEIGHT[t]) / total));
-    left -= v;
-    return [t, Math.max(1, v)];
+// 가중치대로 n개를 나누기 (합이 정확히 n)
+function split(n, entries) {
+  const total = entries.reduce((s, [, w]) => s + w, 0) || 1;
+  const raw = entries.map(([k, w]) => [k, (n * w) / total]);
+  const out = raw.map(([k, v]) => [k, Math.floor(v)]);
+  let left = n - out.reduce((s, [, v]) => s + v, 0);
+  raw.map(([, v], i) => [v - Math.floor(v), i]).sort((x, y) => y[0] - x[0]).forEach(([, i]) => { if (left > 0) { out[i][1] += 1; left -= 1; } });
+  return out.filter(([, v]) => v > 0);
+}
+
+export function promptTotal(opts) {
+  const o = { ...DEFAULT_PROMPT_OPTS, ...opts };
+  return TIERS.reduce((s, t) => s + (Number(o.tiers?.[t]) || 0), 0);
+}
+
+function composition(opts) {
+  const o = { ...DEFAULT_PROMPT_OPTS, ...opts, tiers: { ...DEFAULT_PROMPT_OPTS.tiers, ...(opts.tiers || {}) } };
+  const types = o.types.length ? o.types : DEFAULT_PROMPT_OPTS.types;
+  const curve = PROMPT_LEVELS[o.level]?.[1] || PROMPT_LEVELS.mix[1];
+  const used = TIERS.filter((t) => Number(o.tiers[t]) > 0);
+  const blocks = used.map((t) => {
+    const n = Number(o.tiers[t]);
+    const info = TIER_INFO[t];
+    let w = types.map((k) => [k, info.weights[k] || 0]).filter(([, v]) => v > 0);
+    if (!w.length) w = types.map((k) => [k, 1]);
+    const typeLine = split(n, w).map(([k, v]) => `${k} ${v}개`).join(', ');
+    const diff = split(n, curve.map((v, i) => [i + 1, v]));
+    const diffLine = diff.map(([d, v]) => `${DIFFICULTY[d]}(${d}) ${v}개`).join(', ');
+    return `   [${info.name}] ${n}문제 — ${info.level}
+     · 이렇게 내기: ${info.guide}
+     · 유형: ${typeLine}
+     · 난이도: ${diffLine}`;
   });
-  const [e, m, h] = PROMPT_LEVELS[level]?.[1] || PROMPT_LEVELS.mix[1];
-  return `4. questions: 퀴즈 ${count}문제, 아래 구성으로
-${n.map(([t, v]) => `   - ${t} ${v}개 (${TYPE_HINT[t]})`).join('\n')}
-   - 난이도 비율: 쉬움(1) 약 ${e}%, 보통(2) 약 ${m}%, 도전(3) 약 ${h}%`;
+  return `4. questions: 그룹별 퀴즈 모두 ${promptTotal(o)}문제. 모든 문제에 "tier"("가"/"나"/"다")와 "difficulty"(1~4)를 꼭 넣을 것
+${blocks.join('\n')}
+   - 같은 핵심 개념을 그룹마다 수준에 맞게 다르게 물어볼 것 (다 그룹: 알아보기 → 나 그룹: 이해 → 가 그룹: 적용·추론)
+   - 한 그룹 안에서도 쉬움(1)에서 도전(4)으로 갈수록 생각하는 단계가 하나씩 늘어나게 만들 것
+   - 유형 설명: ${types.map((k) => `${k}=${TYPE_HINT[k]}`).join(' / ')}`;
 }
 
 const PROMPT_HEAD = `너는 특수학급 선생님을 돕는 복습 자료 제작 도우미야.
 첨부한 수업 자료(아이캔노트 판서, 학습지, 교과서 PDF·이미지)를 꼼꼼히 읽고, 학생들이 복습할 자료와 퀴즈를 만들어 줘.
 
 [학생 정보]
-- 특수학급 학생 5명, 읽기·이해 수준은 초등 3~6학년 정도
+- 특수학급 학생 5명. 수준이 달라서 세 그룹으로 나눠 공부해요
+  · 가 그룹(상): ${TIER_INFO.가.level} / 나 그룹(중): ${TIER_INFO.나.level} / 다 그룹(하): ${TIER_INFO.다.level}
 - 짧고 쉬운 문장, 한 문장에 한 가지 내용만
-- 어려운 낱말은 쉬운 말로 풀어서 설명
+- 어려운 낱말은 쉬운 말로 풀어서 설명 (요약·핵심·낱말 카드는 나 그룹 수준으로)
 
 [만들 것]
 1. summary: 오늘 배운 내용 요약 (5~8문장, 쉬운 말, 줄바꿈 \\n 사용 가능)
@@ -225,7 +273,12 @@ const PROMPT_RULES = `
 [규칙]
 - 자료에 있는 내용으로만 만들 것. 자료에 없는 내용은 지어내지 말 것
 - 손글씨 판서가 잘 안 보이는 부분은 문제로 내지 말 것
-- difficulty: 1 쉬움, 2 보통, 3 도전
+- tier: 그 문제를 풀 그룹 "가", "나", "다" 중 하나
+- difficulty: 그룹 안에서의 난이도
+  1 쉬움 = ${DIFFICULTY_DESC[1]}
+  2 보통 = ${DIFFICULTY_DESC[2]}
+  3 어려움 = ${DIFFICULTY_DESC[3]}
+  4 도전 = ${DIFFICULTY_DESC[4]}
 - mcq의 answer는 정답 보기의 번호(1~5)
 - short의 answers에는 정답으로 인정할 표현을 모두 넣을 것 (예: ["광합성", "광합성 작용"])
 - match의 pairs는 [왼쪽, 오른쪽] 순서, 오른쪽 낱말끼리 겹치지 않게
@@ -245,13 +298,13 @@ const PROMPT_RULES = `
   "key_points": ["핵심1", "핵심2"],
   "flashcards": [{"front": "낱말", "back": "뜻"}],
   "questions": [
-    {"type": "ox", "difficulty": 1, "prompt": "문제", "answer": true, "explanation": "해설"},
-    {"type": "mcq", "difficulty": 2, "prompt": "문제", "choices": ["보기1", "보기2", "보기3", "보기4", "보기5"], "answer": 3, "explanation": "해설"},
-    {"type": "short", "difficulty": 2, "prompt": "문제", "answers": ["정답", "다른 표현"], "explanation": "해설"},
-    {"type": "match", "difficulty": 1, "prompt": "알맞은 것끼리 연결하세요", "pairs": [["왼쪽1", "오른쪽1"], ["왼쪽2", "오른쪽2"], ["왼쪽3", "오른쪽3"]]},
-    {"type": "order", "difficulty": 2, "prompt": "순서대로 놓으세요", "items": ["1단계", "2단계", "3단계"]},
-    {"type": "essay", "difficulty": 3, "prompt": "문제", "model_answer": "예시 답안", "keywords": ["채점할 때 볼 핵심 낱말"]},
-    {"type": "frac", "difficulty": 2, "prompt": "{7/3}을 대분수로 나타내세요.", "answer": "2 1/3", "form": "mixed", "lowest": false, "explanation": "7÷3은 몫이 2, 나머지가 1이라서 {2 1/3}이에요."}
+    {"type": "ox", "tier": "다", "difficulty": 1, "prompt": "문제", "answer": true, "explanation": "해설"},
+    {"type": "mcq", "tier": "나", "difficulty": 2, "prompt": "문제", "choices": ["보기1", "보기2", "보기3", "보기4", "보기5"], "answer": 3, "explanation": "해설"},
+    {"type": "short", "tier": "나", "difficulty": 3, "prompt": "문제", "answers": ["정답", "다른 표현"], "explanation": "해설"},
+    {"type": "match", "tier": "다", "difficulty": 2, "prompt": "알맞은 것끼리 연결하세요", "pairs": [["왼쪽1", "오른쪽1"], ["왼쪽2", "오른쪽2"], ["왼쪽3", "오른쪽3"]]},
+    {"type": "order", "tier": "가", "difficulty": 2, "prompt": "순서대로 놓으세요", "items": ["1단계", "2단계", "3단계"]},
+    {"type": "essay", "tier": "가", "difficulty": 4, "prompt": "문제", "model_answer": "예시 답안", "keywords": ["채점할 때 볼 핵심 낱말"]},
+    {"type": "frac", "tier": "가", "difficulty": 3, "prompt": "{7/3}을 대분수로 나타내세요.", "answer": "2 1/3", "form": "mixed", "lowest": false, "explanation": "7÷3은 몫이 2, 나머지가 1이라서 {2 1/3}이에요."}
   ]
 }
 \`\`\``;
@@ -263,13 +316,13 @@ export function buildPrompt(opts = DEFAULT_PROMPT_OPTS) {
 // 같은 내용으로 "다른 문제 세트" 만들기 (이미 있는 문제와 겹치지 않게)
 export function buildVariantPrompt(lesson, questions, opts = DEFAULT_PROMPT_OPTS) {
   const o = { ...DEFAULT_PROMPT_OPTS, ...opts };
-  const old = questions.map((q, i) => `${i + 1}. [${q.type}] ${q.prompt}`).join('\n');
+  const old = questions.map((q, i) => `${i + 1}. [${q.tier || '공통'}·${q.type}] ${q.prompt}`).join('\n');
   return `너는 특수학급 선생님을 돕는 복습 퀴즈 제작 도우미야.
 아래 수업 내용으로 이미 퀴즈를 한 번 만들었어. 학생들이 같은 문제에 익숙해져서 외워 버리지 않도록,
 **같은 내용이지만 새로운 문제**를 만들어 줘.
 
 [학생 정보]
-- 특수학급 학생, 읽기·이해 수준은 초등 3~6학년 정도. 짧고 쉬운 문장으로.
+- 특수학급 학생. 가 그룹(상) ${TIER_INFO.가.level}, 나 그룹(중) ${TIER_INFO.나.level}, 다 그룹(하) ${TIER_INFO.다.level}. 짧고 쉬운 문장으로.
 
 [수업 내용]
 제목: ${lesson.title}

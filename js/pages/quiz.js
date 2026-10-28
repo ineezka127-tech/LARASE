@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useMemo, useRef } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
-import { checkAnswer, answerText, TYPES, DIFFICULTY } from '../lib/questions.js';
+import { checkAnswer, answerText, TYPES, DIFFICULTY, TIERS, tierOf } from '../lib/questions.js';
 import { speak, stopSpeaking, getAutoRead, setAutoRead, ttsSupported } from '../lib/tts.js';
 import { Loading, ErrorBox, SpeakBtn, reward, shuffle, toast } from '../components/ui.js';
 import { RichText, FractionInput } from '../components/math.js';
@@ -138,6 +138,41 @@ function prepare(q) {
   return { ...q, _map: order, data: { ...q.data, choices: order.map((i) => q.data.choices[i]), answer: order.indexOf(q.data.answer - 1) + 1 } };
 }
 
+// 🎯 맞춤 난이도: 맞히면 한 단계 위, 틀리면 한 단계 아래 문제를 골라요 (1 쉬움 ~ 4 도전)
+// 같은 난이도 안에서는 지난번에 틀린 문제 → 안 푼 문제 → 맞힌 문제 순서
+function pickNext(cands, level, last, used) {
+  let best = null;
+  let bestScore = Infinity;
+  for (const q of cands) {
+    if (used.has(q.id)) continue;
+    const seen = last[q.id] === false ? 0 : !(q.id in last) ? 1 : 3;
+    const score = Math.abs(q.difficulty - level) * 10 + seen + Math.random() * 2;
+    if (score < bestScore) { bestScore = score; best = q; }
+  }
+  return best ? prepare(best) : null;
+}
+const nextLevel = (level, correct) => (correct === true ? Math.min(4, level + 1) : correct === false ? Math.max(1, level - 1) : level);
+
+// 처음 난이도: 이 문제들을 전에 잘 풀었으면 '보통'부터, 아니면 '쉬움'부터 (몸풀기)
+function startLevel(cands, last) {
+  const seen = cands.filter((q) => q.id in last && last[q.id] !== null);
+  if (seen.length < 3) return 1;
+  return seen.filter((q) => last[q.id]).length / seen.length >= 0.75 ? 2 : 1;
+}
+
+// 내 그룹 문제 + 공통 문제. 모자라면 가까운 그룹에서 빌려 와요
+const NEAR = { 가: ['나', '다'], 나: ['다', '가'], 다: ['나', '가'] };
+function forTier(pool, tier, n) {
+  const mine = pool.filter((q) => !q.tier || q.tier === tier);
+  if (mine.length >= n) return mine;
+  const out = [...mine];
+  for (const t of NEAR[tier]) {
+    if (out.length >= n) break;
+    out.push(...pool.filter((q) => q.tier === t));
+  }
+  return out;
+}
+
 function drawQuestions(pool, last, n) {
   const wrong = shuffle(pool.filter((q) => last[q.id] === false));
   const fresh = shuffle(pool.filter((q) => !(q.id in last)));
@@ -188,12 +223,25 @@ async function loadQuiz(source, profile, query) {
   let pool = q.data;
   const group = !source.lesson;
   if (group) pool = pool.filter((x) => x.type !== 'essay');          // 묶음 퀴즈는 서술형 빼기
-  if (query.d) pool = pool.filter((x) => String(x.difficulty) === query.d);
+  if (query.d) {
+    const all = pool.filter((x) => String(x.difficulty) === query.d);
+    const mine = all.filter((x) => profile.role === 'teacher' || !x.tier || x.tier === tierOf(profile));
+    pool = mine.length ? mine : all;
+  }
+  const n = group ? 10 : 12;
   let list;
+  let adaptive = null;
   if (query.wrong) list = shuffle(pool.filter((x) => last[x.id] === false)).map(prepare);
-  else list = drawQuestions(pool, last, group ? 10 : 12);
+  else if (query.d || profile.role === 'teacher') list = drawQuestions(pool, last, n);   // 난이도를 직접 골랐거나 선생님 미리보기
+  else {
+    const cands = forTier(pool, tierOf(profile), n);
+    const level = startLevel(cands, last);
+    const first = pickNext(cands, level, last, new Set());
+    list = first ? [first] : [];
+    adaptive = { cands, last, n: Math.min(n, cands.length), level };
+  }
   const ref = source.lesson ? null : source.topic ? 'topic:' + source.topic : `range:${source.range?.from || ''}:${source.range?.to || ''}:${source.range?.s || ''}`;
-  return { title, backHref, list, ref, lessonId: source.lesson || null };
+  return { title, backHref, list, ref, lessonId: source.lesson || null, adaptive };
 }
 
 export function QuizPage({ source, profile, query }) {
@@ -208,9 +256,10 @@ export function QuizPage({ source, profile, query }) {
   const [err, setErr] = useState(null);
   const [auto, setAuto] = useState(getAutoRead());
   const [round, setRound] = useState(1);
+  const [level, setLevel] = useState(1);
 
   useEffect(() => {
-    loadQuiz(source, profile, query).then((m) => { setMeta(m); setList(m.list); }).catch((e) => setErr(friendlyError(e)));
+    loadQuiz(source, profile, query).then((m) => { setMeta(m); setList(m.list); setLevel(m.adaptive?.level || 1); }).catch((e) => setErr(friendlyError(e)));
     return () => stopSpeaking();
   }, []);
   const lessonId = meta?.lessonId;
@@ -244,11 +293,21 @@ export function QuizPage({ source, profile, query }) {
     setBusy(false);
   };
 
+  const adaptiveRound = meta?.adaptive && round === 1;
+  const total = adaptiveRound ? meta.adaptive.n : list.length;
   const next = async () => {
     stopSpeaking();
     if (idx + 1 < list.length) {
       setIdx(idx + 1); setAnswer(undefined); setResult(null);
       return;
+    }
+    if (adaptiveRound && idx + 1 < total) {
+      const lv = nextLevel(level, result?.correct);
+      const nq = pickNext(meta.adaptive.cands, lv, meta.adaptive.last, new Set(list.map((x) => x.id)));
+      if (nq) {
+        setLevel(lv); setList([...list, nq]); setIdx(idx + 1); setAnswer(undefined); setResult(null);
+        return;
+      }
     }
     const graded = results.filter((r) => r.correct !== null);
     const right = graded.filter((r) => r.correct).length;
@@ -267,7 +326,7 @@ export function QuizPage({ source, profile, query }) {
   // 🔁 같은 내용, 새로 뽑은 문제로 다시
   const restart = async () => {
     setList(null); setFinish(null); setIdx(0); setAnswer(undefined); setResult(null); setResults([]); setRound(1);
-    try { const m = await loadQuiz(source, profile, query); setMeta(m); setList(m.list); } catch (e) { setErr(friendlyError(e)); }
+    try { const m = await loadQuiz(source, profile, query); setMeta(m); setList(m.list); setLevel(m.adaptive?.level || 1); } catch (e) { setErr(friendlyError(e)); }
   };
 
   const retryWrong = () => {
@@ -304,13 +363,13 @@ export function QuizPage({ source, profile, query }) {
       <a class="back" href=${meta.backHref}>← ${meta.title}</a>
       ${ttsSupported && html`<label class="toggle"><input type="checkbox" checked=${auto} onChange=${(e) => { setAuto(e.target.checked); setAutoRead(e.target.checked); }} /> 자동 읽기</label>`}
     </div>
-    <div class="dots">${list.map((_, i) => {
+    <div class="dots">${Array.from({ length: total }, (_, i) => {
       const r = results[i];
       const cls = 'dot' + (i === idx ? ' cur' : '') + (r ? (r.correct === false ? ' bad' : ' good') : '');
       return html`<span class=${cls}></span>`;
     })}</div>
     <div class="card question" key=${q.id + round}>
-      <div class="q-meta"><span class="pill">${TYPES[q.type].icon} ${TYPES[q.type].label}</span><span class=${'pill d' + q.difficulty}>${DIFFICULTY[q.difficulty]}</span><span class="muted">${idx + 1} / ${list.length}</span></div>
+      <div class="q-meta"><span class="pill">${TYPES[q.type].icon} ${TYPES[q.type].label}</span><span class=${'pill d' + q.difficulty}>${DIFFICULTY[q.difficulty]}</span><span class="muted">${idx + 1} / ${total}</span></div>
       <div class="q-prompt"><${RichText} text=${q.prompt} /> <${SpeakBtn} text=${q.prompt} /></div>
       <${View} q=${q} done=${done} answer=${answer} onAnswer=${submit} />
     </div>
@@ -324,7 +383,8 @@ export function QuizPage({ source, profile, query }) {
       ${result.correct === false && q.type !== 'match' && q.type !== 'order' && html`<div class="fb-answer">정답: <b><${RichText} text=${answerText(q)} /></b></div>`}
       ${result.correct === null && q.data.model_answer && html`<div class="fb-answer"><b>예시 답안</b><br/>${q.data.model_answer}</div>`}
       ${q.data.explanation && html`<div class="fb-explain">📘 <${RichText} text=${q.data.explanation} /> <${SpeakBtn} text=${q.data.explanation} /></div>`}
-      <button class="btn huge primary block" onClick=${next}>${idx + 1 < list.length ? '다음 문제 ▶' : '결과 보기 🏁'}</button>
+      ${adaptiveRound && result.correct === true && level < 4 && idx + 1 < total && html`<div class="level-up-note">🔺 다음 문제는 조금 더 어려워요!</div>`}
+      <button class="btn huge primary block" onClick=${next}>${idx + 1 < total ? '다음 문제 ▶' : '결과 보기 🏁'}</button>
     </div>`}
   </div>`;
 }

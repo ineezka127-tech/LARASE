@@ -1,13 +1,18 @@
 // Supabase 연결과 로그인 도우미
 const cfg = window.APP_CONFIG || {};
 
+// 📄 어느 페이지인지: index.html = 학생 페이지, teacher.html = 선생님 페이지
+// 로그인 정보를 따로 저장해서, 같은 브라우저에서 선생님 페이지와 학생(테스트) 페이지를 동시에 열어 둘 수 있어요
+export const APP_MODE = window.APP_MODE === 'teacher' ? 'teacher' : 'student';
+export const OTHER_PAGE = APP_MODE === 'teacher' ? './' : './teacher.html';
+
 export const configured =
   !!cfg.SUPABASE_URL && !!cfg.SUPABASE_KEY &&
   !cfg.SUPABASE_URL.includes('여기에') && !cfg.SUPABASE_KEY.includes('여기에');
 
 export const sb = configured
   ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bokseup-auth' },
+      auth: { persistSession: true, autoRefreshToken: true, storageKey: APP_MODE === 'teacher' ? 'bokseup-teacher-auth' : 'bokseup-auth' },
     })
   : null;
 
@@ -69,6 +74,7 @@ export function friendlyError(e) {
   if (/already registered|already been registered|User already/i.test(m)) return '이미 있는 아이디예요.';
   if (/email (signups|logins|provider).*disabled|email.*not enabled/i.test(m)) return `Supabase에서 이메일 로그인 방식이 꺼져 있어요. (Authentication → Sign In / Providers → 아래 목록의 Email → Enable Email provider 켜기) [${m}]`;
   if (/Signups not allowed|signup.*disabled/i.test(m)) return `Supabase에서 새 계정 만들기가 꺼져 있어요. (Authentication → Sign In / Providers → Allow new users to sign up) [${m}]`;
+  if (/SIGNUP_CLOSED|Database error saving new user/i.test(m)) return '새 계정 만들기가 잠겨 있어요. 선생님 페이지 → 👥 학생 관리에서 계정을 만들어 주세요. (그때 10분 동안만 열려요)';
   if (/duplicate key|already exists|23505/i.test(m)) return '이미 있는 이름이에요. 다른 이름을 써 주세요.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return '인터넷 연결을 확인해 주세요.';
   if (/rate limit/i.test(m)) return '잠시 후에 다시 해 주세요. (요청이 너무 많아요)';

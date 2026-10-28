@@ -778,3 +778,109 @@ a.card:hover, .card.action:hover { transform: translateY(-2px); box-shadow: var(
   .me-chip { min-width: 0; }
   .me-chip-body { min-width: 84px; }
 }
+.pill.d3 { background: #fff1e6; color: #c2410c; }
+.pill.d4 { background: #f3e8ff; color: #8a3ffc; }
+
+/* =====================================================================
+   v9: 선생님 페이지 · 실시간 현황 · 리포트 · 그룹
+   ===================================================================== */
+.mode-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 0.62em; font-weight: 800; vertical-align: middle; letter-spacing: 0; }
+.other-page { display: block; margin-top: 16px; font-size: 0.9em; color: var(--muted); }
+.app.teacher .topbar { border-bottom: 2px solid var(--ink); }
+
+/* 가/나/다 그룹 */
+.tier-badge { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; font-weight: 800; font-size: 0.85em; color: #fff; background: #868e96; vertical-align: middle; }
+.tier-badge.sm { width: 20px; height: 20px; border-radius: 6px; font-size: 0.72em; }
+.t-가 .tier-badge, .tier-badge.t-가 { background: #e8590c; }
+.t-나 .tier-badge, .tier-badge.t-나 { background: #1c7ed6; }
+.t-다 .tier-badge, .tier-badge.t-다 { background: #2f9e44; }
+.tier-pick { display: inline-flex; gap: 3px; }
+.tier-btn { width: 32px; height: 32px; border-radius: 9px; border: 1.5px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; color: var(--muted); }
+.tier-btn.on.t-가 { background: #e8590c; border-color: #e8590c; color: #fff; }
+.tier-btn.on.t-나 { background: #1c7ed6; border-color: #1c7ed6; color: #fff; }
+.tier-btn.on.t-다 { background: #2f9e44; border-color: #2f9e44; color: #fff; }
+.tier-counts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.tier-count { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; font-weight: 600; }
+.tier-count span:nth-child(2) { display: flex; flex-direction: column; line-height: 1.2; }
+.tier-count small { color: var(--muted); font-weight: 500; font-size: 0.75em; }
+.tier-count .input { width: auto; margin: 0; padding: 6px 8px; }
+.tier-count.off { opacity: 0.55; }
+.level-up-note { text-align: center; font-weight: 800; color: #c2410c; margin: 4px 0 8px; }
+
+/* 성실도 */
+.effort-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.effort-row .chip { padding: 4px 12px; }
+
+/* 선생님 홈: 바로가기 + 저장 공간 */
+.home-tools { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin-top: 12px; }
+.home-tools .card { margin: 0; }
+.live-link { display: flex; flex-direction: column; justify-content: center; gap: 2px; color: var(--ink); position: relative; }
+.live-link small { font-size: 0.8em; }
+.live-dot { position: absolute; top: 14px; right: 14px; width: 10px; height: 10px; border-radius: 50%; background: #40c057; box-shadow: 0 0 0 4px rgba(64, 192, 87, 0.2); animation: pulse 1.6s ease-in-out infinite; }
+.storage-card { display: flex; flex-direction: column; gap: 6px; font-size: 0.92em; }
+.su-row { display: grid; grid-template-columns: 9.5em 1fr auto; gap: 10px; align-items: center; }
+.su-label { color: var(--muted); font-size: 0.9em; }
+.su-val { font-size: 0.85em; white-space: nowrap; }
+@media (max-width: 900px) { .home-tools { grid-template-columns: 1fr 1fr; } .storage-card { grid-column: 1 / -1; } }
+
+/* 막대 */
+.bars { display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: grid; grid-template-columns: minmax(7em, 13em) 1fr auto; gap: 10px; align-items: center; font-size: 0.92em; }
+.bar-track { height: 12px; background: #eef0f6; border-radius: 999px; overflow: hidden; display: block; }
+.bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--primary); transition: width 0.4s; }
+.bar-fill.hi { background: linear-gradient(90deg, #51cf66, #2f9e44); }
+.bar-fill.mid { background: linear-gradient(90deg, #ffd43b, #f59f00); }
+.bar-fill.lo { background: linear-gradient(90deg, #ff8787, #e03131); }
+.bar-val { white-space: nowrap; }
+h2.mt { margin-top: 18px; }
+
+/* 리포트 */
+.report-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.report-head h1 { margin: 0 0 4px; }
+.rh-body { flex: 1; min-width: 200px; }
+.rh-actions { display: flex; gap: 8px; }
+.period-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.period-pick .chip { margin: 0; }
+.range-in { display: inline-flex; gap: 6px; align-items: center; }
+.range-in .input { width: auto; }
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tile { background: #fff; border: 1px solid rgba(29, 33, 64, 0.06); border-radius: 18px; padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.tile small { color: var(--muted); font-weight: 600; font-size: 0.8em; }
+.tile b { font-size: 1.8em; line-height: 1.2; }
+.tile b small { font-size: 0.5em; margin-left: 2px; }
+.acc-text.hi { color: #2f9e44; } .acc-text.mid { color: #e67700; } .acc-text.lo { color: #e03131; }
+.essay-row { border-top: 1px solid var(--line); padding: 10px 0; display: flex; flex-direction: column; gap: 4px; }
+.essay-row:first-of-type { border-top: none; }
+.essay-ans { background: #f8f9fc; border-radius: 12px; padding: 8px 12px; }
+.md-preview { white-space: pre-wrap; font-size: 0.8em; background: #f8f9fc; padding: 14px; border-radius: 12px; max-height: 480px; overflow: auto; }
+.student-pick { display: flex; align-items: center; gap: 12px; color: var(--ink); }
+
+/* 실시간 현황 */
+.live-badge { font-weight: 800; font-size: 0.85em; padding: 4px 12px; border-radius: 999px; background: #f1f3f5; color: var(--muted); }
+.live-badge.on { background: #e6fcf5; color: #0ca678; }
+.live-badge.poll { background: #fff4e6; color: #e8590c; }
+.live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.live-card { margin: 0; color: var(--ink); display: flex; flex-direction: column; gap: 8px; border-left: 5px solid #dee2e6; }
+.live-card.now { border-left-color: #40c057; }
+.live-card.recent { border-left-color: #fab005; }
+.lc-head { display: flex; align-items: center; gap: 10px; position: relative; }
+.lc-dot { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: #ced4da; border: 2px solid #fff; z-index: 1; }
+.live-card.now .lc-dot { background: #40c057; animation: pulse 1.6s ease-in-out infinite; }
+.live-card.recent .lc-dot { background: #fab005; }
+.lc-where { font-size: 0.85em; font-weight: 600; color: var(--muted); min-height: 1.4em; }
+.lc-stats { display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.82em; font-weight: 700; }
+.lc-stats span { background: #f4f5fa; border-radius: 999px; padding: 2px 9px; }
+.lc-recent { display: flex; gap: 4px; min-height: 12px; }
+.rd { width: 12px; height: 12px; border-radius: 4px; }
+.rd.ok { background: #51cf66; } .rd.no { background: #ff8787; }
+.feed { padding: 6px 0; }
+.feed-row { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #f1f3f5; font-size: 0.9em; flex-wrap: wrap; }
+.feed-row:last-child { border-bottom: none; }
+.feed-row.no { background: #fff8f8; }
+.feed-row.essay { background: #f8f7ff; }
+.feed-row.new { animation: flash-in 2.5s ease-out; }
+@keyframes flash-in { 0% { background: #fff3bf; } 100% { background: transparent; } }
+.fr-time { color: var(--muted); font-size: 0.8em; width: 3.6em; flex: none; font-variant-numeric: tabular-nums; }
+.fr-q { flex: 1; min-width: 200px; }
+.fr-ans { color: #c92a2a; font-size: 0.92em; }
+.feed-row.essay .fr-ans { color: #5f3dc4; }

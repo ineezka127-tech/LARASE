@@ -1,15 +1,16 @@
 import { html, useState } from '../../vendor/preact-htm.js';
-import { sb, rpc, signIn, createAccount, friendlyError, normalizeLoginId } from '../lib/sb.js';
+import { sb, rpc, signIn, createAccount, friendlyError, normalizeLoginId, APP_MODE, OTHER_PAGE } from '../lib/sb.js';
 import { cleanCfg } from '../lib/avatar.js';
 import { AvatarBuilder } from './avatar.js';
 
+const RECENT_KEY = APP_MODE === 'teacher' ? 'bokseup-recent-ids-teacher' : 'bokseup-recent-ids';
 function recentIds() {
-  try { return JSON.parse(localStorage.getItem('bokseup-recent-ids') || '[]'); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; }
 }
 function rememberId(id) {
   try {
     const list = [id, ...recentIds().filter((x) => x !== id)].slice(0, 6);
-    localStorage.setItem('bokseup-recent-ids', JSON.stringify(list));
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
   } catch {}
 }
 
@@ -45,15 +46,16 @@ export function LoginPage({ appName }) {
 
   return html`<div class="login-wrap">
     <form class="card login" onSubmit=${submit}>
-      <div class="login-logo">📚</div>
-      <h1>${appName}</h1>
-      <p class="muted">오늘 배운 것, 다시 한번 해 볼까요?</p>
+      <div class="login-logo">${APP_MODE === 'teacher' ? '🧑‍🏫' : '📚'}</div>
+      <h1>${appName}${APP_MODE === 'teacher' ? html` <span class="mode-tag">선생님</span>` : ''}</h1>
+      <p class="muted">${APP_MODE === 'teacher' ? '수업 자료·학생 현황·채점을 관리해요' : '오늘 배운 것, 다시 한번 해 볼까요?'}</p>
       ${recent.length > 0 && html`<div class="chips">${recent.map((r) => html`
         <button type="button" class=${'chip' + (r === id ? ' on' : '')} onClick=${() => setId(r)}>${r}</button>`)}</div>`}
       <label>아이디<input class="input big" value=${id} onInput=${(e) => setId(e.target.value)} autocomplete="username" placeholder="예: 특수1" /></label>
       <label>비밀번호<input class="input big" type="password" value=${pw} onInput=${(e) => setPw(e.target.value)} autocomplete="current-password" /></label>
       ${err && html`<div class="error-box">${err}</div>`}
       <button class="btn big primary block" disabled=${busy}>${busy ? '들어가는 중…' : '들어가기 🚀'}</button>
+      <a class="other-page" href=${OTHER_PAGE}>${APP_MODE === 'teacher' ? '📚 학생 페이지로 →' : '🧑‍🏫 선생님 페이지'}</a>
     </form>
   </div>`;
 }

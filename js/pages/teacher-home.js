@@ -1,5 +1,5 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
-import { sb, friendlyError } from '../lib/sb.js';
+import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { answerText, TYPES } from '../lib/questions.js';
 import { Loading, ErrorBox, XPBar, fmtDate, timeAgo } from '../components/ui.js';
 import { RichText } from '../components/math.js';
@@ -10,6 +10,25 @@ import { fracToken } from '../lib/fraction.js';
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
 const accClass = (t) => { const n = parseInt(t, 10); return isNaN(n) ? 'none' : n >= 80 ? 'hi' : n >= 50 ? 'mid' : 'lo'; };
+
+// 💾 저장 공간 (무료 한도 대비)
+const mb = (b) => (b >= 1024 * 1024 * 100 ? Math.round(b / 1024 / 1024) : Math.round((b / 1024 / 1024) * 10) / 10);
+function StorageCard() {
+  const [u, setU] = useState(null);
+  useEffect(() => { rpc('storage_usage').then(setU).catch(() => setU(false)); }, []);
+  if (!u) return null;
+  const row = (label, used, limit, extra) => {
+    const p = Math.min(100, (used / limit) * 100);
+    return html`<div class="su-row"><span class="su-label">${label}</span>
+      <span class="bar-track"><span class=${'bar-fill ' + (p > 80 ? 'lo' : p > 60 ? 'mid' : 'hi')} style=${`width:${Math.max(p, 1)}%`}></span></span>
+      <span class="su-val"><b>${mb(used)}MB</b> / ${mb(limit) >= 1024 ? '1GB' : mb(limit) + 'MB'} <small class="muted">(${p < 1 ? '1% 미만' : Math.round(p) + '%'})${extra || ''}</small></span></div>`;
+  };
+  return html`<div class="card storage-card">
+    <b>💾 저장 공간</b> <small class="muted">Supabase 무료 한도</small>
+    ${row('데이터 (문제·기록)', u.db_bytes, u.db_limit)}
+    ${row('파일 (판서·자료)', u.file_bytes, u.file_limit, ` · 판서 ${u.file_count}장`)}
+  </div>`;
+}
 
 export function TeacherHome() {
   const [d, setD] = useState(null);
@@ -67,6 +86,12 @@ export function TeacherHome() {
       <${PraiseButton} className="card action praise-action" label=${html`<span>🎁</span><div>칭찬·약속<small>경험치·코인·주사위</small></div>`} />
     </div>
 
+    <div class="home-tools">
+      <a class="card live-link" href="#/t/live"><span class="live-dot"></span><b>📡 실시간 현황</b><small class="muted">지금 누가 무엇을 풀고 있는지</small></a>
+      <a class="card live-link" href="#/t/report"><b>📄 학습 리포트</b><small class="muted">개별화교육용 .md 내려받기</small></a>
+      <${StorageCard} />
+    </div>
+
     <h2>👥 학생 현황 <small class="muted">(최근 30일)</small></h2>
     ${d.students.length === 0 && html`<div class="card empty">학생 계정이 없어요. <a href="#/t/students">학생 계정 만들기 →</a></div>`}
     <div class="grid">${d.students.map((s) => card(s))}</div>
@@ -120,7 +145,7 @@ export function StudentDetail({ studentId }) {
   const wrongNow = Object.values(last).filter((a) => a.is_correct === false);
 
   return html`<div class="page">
-    <a class="back" href="#/">← 현황</a>
+    <div class="page-head"><a class="back" href="#/">← 현황</a><a class="btn small primary" href=${'#/t/report/' + studentId}>📄 학습 리포트·.md</a></div>
     <section class="card me-card">
       <${AvatarImg} cfg=${s.avatar_cfg} mode="full" size=${120} />
       <div class="hero-body">

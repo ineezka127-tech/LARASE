@@ -1,6 +1,6 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
-import { TYPES, DIFFICULTY, FRAC_FORMS, emptyQuestion, parseAIResult, validateQuestion, buildPrompt, buildVariantPrompt, flashcardQuestions, PROMPT_TYPES, PROMPT_LEVELS, DEFAULT_PROMPT_OPTS } from '../lib/questions.js';
+import { TYPES, DIFFICULTY, FRAC_FORMS, emptyQuestion, parseAIResult, validateQuestion, buildPrompt, buildVariantPrompt, flashcardQuestions, PROMPT_TYPES, PROMPT_LEVELS, DEFAULT_PROMPT_OPTS, TIERS, TIER_INFO, promptTotal } from '../lib/questions.js';
 import { loadCatalog, remember, store } from '../lib/groups.js';
 import { GroupedLessons } from '../components/grouped.js';
 import { fracToken } from '../lib/fraction.js';
@@ -70,7 +70,7 @@ function QuestionEditor({ q, index, total, onChange, onMove, onDelete, error }) 
   const changeType = (type) => {
     if (type === q.type) return;
     const fresh = emptyQuestion(type);
-    onChange({ ...fresh, id: q.id, prompt: q.prompt, difficulty: q.difficulty });
+    onChange({ ...fresh, id: q.id, prompt: q.prompt, difficulty: q.difficulty, tier: q.tier });
   };
 
   return html`<div class=${'card q-edit' + (error ? ' has-error' : '')}>
@@ -81,8 +81,11 @@ function QuestionEditor({ q, index, total, onChange, onMove, onDelete, error }) 
       <select class="input" value=${q.type} onChange=${(e) => changeType(e.target.value)}>
         ${Object.entries(TYPES).map(([k, t]) => html`<option value=${k}>${t.icon} ${t.label}</option>`)}
       </select>
+      <select class="input" value=${q.tier || ''} title="이 문제를 풀 그룹" onChange=${(e) => set({ tier: e.target.value || null })}>
+        <option value="">공통</option>${TIERS.map((t) => html`<option value=${t}>${t} 그룹</option>`)}
+      </select>
       <select class="input" value=${q.difficulty} onChange=${(e) => set({ difficulty: Number(e.target.value) })}>
-        ${[1, 2, 3].map((n) => html`<option value=${n}>${DIFFICULTY[n]}</option>`)}
+        ${[1, 2, 3, 4].map((n) => html`<option value=${n}>${DIFFICULTY[n]}</option>`)}
       </select>
       <span class="spacer"></span>
       <button class="btn small ghost" disabled=${index === 0} onClick=${() => onMove(-1)}>▲</button>
@@ -147,16 +150,21 @@ function cleanQuestion(q, position, lessonId) {
     data.choices = kept;
     data.answer = ans;
   }
-  return { id: q.id, lesson_id: lessonId, position, type: q.type, difficulty: q.difficulty, prompt: q.prompt.trim(), data, set_no: q.set_no || 1, source: q.source || 'manual' };
+  return { id: q.id, lesson_id: lessonId, position, type: q.type, difficulty: q.difficulty, tier: q.tier || null, prompt: q.prompt.trim(), data, set_no: q.set_no || 1, source: q.source || 'manual' };
 }
 
 // ---------- AI 결과 가져오기 ----------
 function PromptOptions({ opts, setOpts }) {
   const toggle = (t) => setOpts({ ...opts, types: opts.types.includes(t) ? opts.types.filter((x) => x !== t) : [...opts.types, t] });
+  const tiers = { ...DEFAULT_PROMPT_OPTS.tiers, ...(opts.tiers || {}) };
+  const setTier = (t, n) => setOpts({ ...opts, tiers: { ...tiers, [t]: n } });
   return html`<div class="prompt-opts">
-    <label>문항 수 <select class="input" value=${opts.count} onChange=${(e) => setOpts({ ...opts, count: Number(e.target.value) })}>
-      ${[6, 8, 10, 12, 15, 20].map((n) => html`<option value=${n}>${n}문제</option>`)}</select></label>
-    <label>난이도 <select class="input" value=${opts.level} onChange=${(e) => setOpts({ ...opts, level: e.target.value })}>
+    <div class="tier-counts">${TIERS.map((t) => html`<label class=${'tier-count t-' + t + (tiers[t] > 0 ? '' : ' off')} title=${TIER_INFO[t].level}>
+      <span class="tier-badge">${t}</span><span><b>${TIER_INFO[t].name.slice(5)}</b><small>${TIER_INFO[t].level}</small></span>
+      <select class="input" value=${tiers[t]} onChange=${(e) => setTier(t, Number(e.target.value))}>
+        ${[0, 4, 6, 8, 10, 12].map((n) => html`<option value=${n}>${n ? n + '문제' : '안 만듦'}</option>`)}</select></label>`)}
+      <span class="muted small">모두 ${promptTotal(opts)}문제</span></div>
+    <label>그룹 안 난이도 곡선 <select class="input" value=${opts.level} onChange=${(e) => setOpts({ ...opts, level: e.target.value })}>
       ${Object.entries(PROMPT_LEVELS).map(([k, [label]]) => html`<option value=${k}>${label}</option>`)}</select></label>
     <div class="opt-types">문제 유형: ${Object.entries(PROMPT_TYPES).map(([k, label]) => html`<label class="check"><input type="checkbox" checked=${opts.types.includes(k)} onChange=${() => toggle(k)} /> ${label}</label>`)}</div>
   </div>`;
@@ -167,7 +175,7 @@ function AIImport({ onImport, lesson, questions }) {
   const [err, setErr] = useState('');
   const [kind, setKind] = useState('new');   // new: 처음 만들기 / variant: 다른 문제 세트
   const [mode, setMode] = useState('replace');
-  const [opts, setOptsS] = useState(remember('prompt-opts', DEFAULT_PROMPT_OPTS));
+  const [opts, setOptsS] = useState({ ...DEFAULT_PROMPT_OPTS, ...remember('prompt-opts', DEFAULT_PROMPT_OPTS) });
   const setOpts = (o) => { setOptsS(o); store('prompt-opts', o); };
   const prompt = kind === 'variant' ? buildVariantPrompt(lesson, questions, opts) : buildPrompt(opts);
 

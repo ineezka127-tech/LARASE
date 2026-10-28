@@ -2,6 +2,7 @@ import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, rpc, createAccount, friendlyError, normalizeLoginId } from '../lib/sb.js';
 import { Loading, ErrorBox, toast } from '../components/ui.js';
 import { AvatarImg } from '../components/avatar-ui.js';
+import { TIERS, TIER_INFO } from '../lib/questions.js';
 
 export function StudentsPage() {
   const [list, setList] = useState(null);
@@ -26,6 +27,8 @@ export function StudentsPage() {
     if (!/^\S{4,}$/.test(pw)) { toast('비밀번호는 4자 이상, 띄어쓰기 없이 해 주세요'); return; }
     setBusy(true);
     const out = [];
+    // 🔒 새 계정 만들기는 평소에 잠겨 있어요. 만드는 동안만 10분 열어요
+    try { await rpc('open_signup', { p_minutes: 10 }); } catch {}
     for (const r of todo) {
       try {
         await createAccount({ loginId: r.id, password: pw, role: 'student', grade: r.grade });
@@ -33,6 +36,7 @@ export function StudentsPage() {
       } catch (e) { out.push(`⚠️ ${r.id}: ${friendlyError(e)}`); }
       setLog([...out]);
     }
+    try { await rpc('open_signup', { p_minutes: 0 }); } catch {}
     setBusy(false);
     load();
   };
@@ -40,6 +44,10 @@ export function StudentsPage() {
   const setGrade = async (s, grade) => {
     const { error } = await sb.from('profiles').update({ grade: grade || null }).eq('id', s.id);
     if (error) toast('⚠️ ' + friendlyError(error)); else { toast('저장했어요 ✔'); load(); }
+  };
+  const setTier = async (s, tier) => {
+    const { error } = await sb.from('profiles').update({ tier: tier || null }).eq('id', s.id);
+    if (error) toast('⚠️ ' + friendlyError(error)); else { toast('그룹을 저장했어요 ✔'); load(); }
   };
   const setTest = async (s, on) => {
     const { error } = await sb.from('profiles').update({ is_test: on }).eq('id', s.id);
@@ -69,16 +77,18 @@ export function StudentsPage() {
     <h1>👥 학생 관리</h1>
     <div class="card">
       <table class="table">
-        <tr><th></th><th>아이디</th><th>화면 이름</th><th>학년</th><th>레벨</th><th>XP</th><th>코인</th><th title="테스트 계정은 현황·정답률·친구 목록에서 빠져요">🧪 테스트</th><th></th></tr>
+        <tr><th></th><th>아이디</th><th>화면 이름</th><th>학년</th><th title="가=상, 나=중, 다=하. 문제를 이 그룹에 맞춰 골라 줘요">그룹</th><th>레벨</th><th>XP</th><th>코인</th><th title="테스트 계정은 현황·정답률·친구 목록에서 빠져요">🧪 테스트</th><th></th></tr>
         ${list.map((s) => html`<tr>
           <td><${AvatarImg} cfg=${s.avatar_cfg} size=${44} /></td><td><b>${s.login_id}</b></td><td>${s.display_name || html`<span class="muted">(아직 안 정함)</span>`}</td>
           <td><select class="input" value=${s.grade || ''} onChange=${(e) => setGrade(s, Number(e.target.value))}>
             <option value="">-</option>${[1, 2, 3].map((g) => html`<option value=${g}>${g}학년</option>`)}</select></td>
+          <td><div class="tier-pick">${TIERS.map((t) => html`<button type="button" class=${'tier-btn t-' + t + ((s.tier || '나') === t ? ' on' : '')} title=${TIER_INFO[t].name} onClick=${() => setTier(s, t)}>${t}</button>`)}</div></td>
           <td>Lv.${s.level}</td><td>${s.xp}</td><td>🪙 ${s.coins ?? 0}</td>
           <td><label class="check"><input type="checkbox" checked=${!!s.is_test} onChange=${(e) => setTest(s, e.target.checked)} /> ${s.is_test ? '테스트' : ''}</label></td>
           <td class="right"><a class="btn small" href=${'#/t/student/' + s.id}>기록·🎁코인</a> <button class="btn small ghost" onClick=${() => clearName(s)}>이름 초기화</button> <button class="btn small ghost" onClick=${() => reset(s)}>🔄 진도 초기화</button></td>
         </tr>`)}
       </table>
+      <p class="muted small">🎯 <b>그룹</b>: 가(상)·나(중)·다(하). 퀴즈와 모험 지도에서 학생 그룹에 맞는 문제가 먼저 나와요. 정하지 않으면 '나'로 봐요.</p>
       <p class="muted small">🧪 <b>테스트</b>에 체크한 계정은 선생님 현황판의 정답률·반 통계와 아이들의 친구 목록에서 빠져요. (선생님이 연습용으로 쓰는 계정에 체크하세요)</p>
       ${list.length === 0 && html`<p class="muted">아직 학생 계정이 없어요. 아래에서 만들어 주세요.</p>`}
       ${list.length > 0 && html`<div class="btn-row"><button class="btn small warn" onClick=${() => reset(null)}>🔄 학생 전체 진도 초기화</button>
