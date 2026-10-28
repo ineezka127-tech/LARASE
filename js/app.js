@@ -44,7 +44,7 @@ function Header({ profile }) {
     <a class="brand" href="#/">📚 <span>${APP_NAME}</span></a>
     <nav>
       ${teacher
-        ? html`${link('#/', '📊 현황')}${link('#/t/lessons', '📚 수업 자료')}${link('#/t/grading', '📝 채점')}${link('#/t/students', '👥 학생')}`
+        ? html`${link('#/', '📊 현황')}${link('#/t/lessons', '📚 수업 자료')}${link('#/t/grading', '📝 채점')}${link('#/t/students', '👥 학생')}${link('#/shop', '🛍️ 상점')}`
         : html`${link('#/', '🏠 홈')}${link('#/game', '🎲 모험')}${link('#/avatar', '🧑‍🎨 꾸미기')}${link('#/shop', '🛍️ 상점')}${link('#/me', '🙋 내 정보')}`}
     </nav>
     ${teacher
@@ -105,7 +105,7 @@ function App() {
   else if (p0 === 'me' && !teacher) page = html`<${MePage} ...${ctx} />`;
   else if (p0 === 'game') page = html`<${GamePage} ...${ctx} />`;
   else if (p0 === 'avatar' && !teacher) page = html`<${AvatarPage} ...${ctx} />`;
-  else if (p0 === 'shop' && !teacher) page = html`<${ShopPage} ...${ctx} />`;
+  else if (p0 === 'shop') page = html`<${ShopPage} ...${ctx} />`;
   else if (teacher && p0 === 't') {
     const sub = p1;
     if (sub === 'lessons') page = html`<${LessonList} />`;

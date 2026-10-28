@@ -23,6 +23,7 @@ const SHOP_SLOTS = [...Object.keys(SLOTS), 'hair', 'hairColor', 'eyes'];
 const EXTRA_LABEL = { hair: '💇 머리 모양', hairColor: '🎨 머리색', eyes: '👀 눈' };
 
 export function ShopPage({ profile, refreshProfile }) {
+  const teacher = profile.role === 'teacher';     // 선생님: 미리보기만 (입어 보기 O, 사기 X)
   const [owned, setOwned] = useState(null);
   const [prices, setPrices] = useState(null);   // 서버에 있는 가격 (화면 표시는 서버 기준)
   const [slot, setSlot] = useState('top');
@@ -33,7 +34,7 @@ export function ShopPage({ profile, refreshProfile }) {
 
   const load = async () => {
     try {
-      const [inv, shop] = await Promise.all([loadInventory(profile.id), sb.from('shop_items').select('id,price,min_level,active')]);
+      const [inv, shop] = await Promise.all([teacher ? new Set() : loadInventory(profile.id), sb.from('shop_items').select('id,price,min_level,active')]);
       if (shop.error) throw shop.error;
       setOwned(inv);
       setPrices(Object.fromEntries(shop.data.map((s) => [s.id, s])));
@@ -74,20 +75,22 @@ export function ShopPage({ profile, refreshProfile }) {
       <${AvatarImg} cfg=${preview} mode="full" size=${150} />
       <div class="shop-info">
         <h1>🛍️ 아바타 상점</h1>
-        <div class="coin-big">🪙 ${profile.coins}</div>
-        <p class="muted small">물건을 누르면 먼저 입어 볼 수 있어요.<br/>문제를 풀고 출석하면 코인이 모여요!</p>
+        ${teacher
+          ? html`<div class="pill warn">👀 선생님 미리보기</div><p class="muted small">학생들이 보는 상점 그대로예요. 물건을 누르면 입어 볼 수 있어요.<br/>가격과 필요한 레벨이 함께 보여요.</p>`
+          : html`<div class="coin-big">🪙 ${profile.coins}</div>
+        <p class="muted small">물건을 누르면 먼저 입어 볼 수 있어요.<br/>문제를 풀고 출석하면 코인이 모여요!</p>`}
         ${Object.keys(tryOn).length > 0 && html`<button class="btn small" onClick=${() => setTryOn({})}>↩️ 원래대로</button>`}
-        <a class="btn small" href="#/avatar">🧑‍🎨 내 옷장</a>
+        ${!teacher && html`<a class="btn small" href="#/avatar">🧑‍🎨 내 옷장</a>`}
       </div>
-      <${StatPanel} profile=${profile} cfg=${preview} editable=${false} />
+      ${!teacher && html`<${StatPanel} profile=${profile} cfg=${preview} editable=${false} />`}
     </div>
 
     <div class="tabs">${SHOP_SLOTS.map((s) => html`<button class=${'tab' + (slot === s ? ' on' : '')} onClick=${() => setSlot(s)}>${SLOTS[s] || EXTRA_LABEL[s]}</button>`)}</div>
 
     <div class="shop-grid">${items.map((it) => {
       const have = owned.has(it.id);
-      const lvLock = profile.level < it.level;
-      const poor = profile.coins < it.price;
+      const lvLock = !teacher && profile.level < it.level;
+      const poor = !teacher && profile.coins < it.price;
       const mode = FULL_SLOTS.includes(it.slot) ? 'full' : 'portrait';
       return html`<div class=${'card shop-item' + (tryOn[it.slot] === it.id ? ' trying' : '') + (lvLock ? ' lv-lock' : '')} style=${it.rarity !== 'common' ? `border-top:5px solid ${RARITY[it.rarity][1]}` : ''}>
         <${RarityTag} item=${it} />
@@ -96,7 +99,9 @@ export function ShopPage({ profile, refreshProfile }) {
         </button>
         <b>${it.name}</b>
         <${ItemStats} item=${it} />
-        ${have
+        ${teacher
+          ? html`<span class="pill">🪙 ${it.price}${it.level > 1 ? ` · Lv.${it.level}+` : ''}</span>`
+          : have
           ? (base[it.slot] === it.id
             ? html`<span class="pill good">입고 있어요</span>`
             : html`<button class="btn small good" onClick=${() => wearNow(it)}>✔ 가짐 · 입기</button>`)

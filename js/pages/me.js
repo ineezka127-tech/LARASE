@@ -8,7 +8,7 @@ import { ITEM } from '../lib/avatar.js';
 const KIND_LABEL = {
   view: '📖 복습 자료 보기', correct: '✅ 처음 맞힘', comeback: '💪 오답 극복', review: '🔁 다시 맞힘',
   try: '🙂 도전', essay: '✍️ 서술형 제출', essay_graded: '🌟 서술형 채점', quiz_done: '🏁 퀴즈 완주', daily: '🔥 출석 보너스',
-  levelup: '⭐ 레벨 업', buy: '🛍️ 상점', teacher_coins: '🎁 선생님 칭찬', coin_start: '🪙 시작 코인',
+  levelup: '⭐ 레벨 업', buy: '🛍️ 상점', teacher_coins: '🎁 선생님 칭찬', teacher_praise: '🎁 선생님 칭찬', teacher_dice: '🎲 선생님 선물', coin_start: '🪙 시작 코인',
 };
 
 export function MePage({ profile, refreshProfile }) {
@@ -81,8 +81,8 @@ export function MePage({ profile, refreshProfile }) {
       </div>
       <div class="card">
         <h2>📜 최근 기록</h2>
-        <table class="table">${data.events.filter((e) => e.xp > 0 || e.coins).slice(0, 14).map((e) => html`<tr>
-          <td class="muted">${fmtDate(e.created_at)}</td><td>${KIND_LABEL[e.kind] || e.kind}${e.kind === 'buy' && ITEM[e.ref] ? ` · ${ITEM[e.ref].name}` : ''}${e.kind === 'teacher_coins' && e.ref ? ` · ${e.ref}` : ''}</td>
+        <table class="table">${data.events.filter((e) => e.xp > 0 || e.coins || e.kind === 'teacher_dice').slice(0, 14).map((e) => html`<tr>
+          <td class="muted">${fmtDate(e.created_at)}</td><td>${e.kind === 'teacher_coins' && e.coins < 0 ? '📌 약속' : KIND_LABEL[e.kind] || e.kind}${e.kind === 'buy' && ITEM[e.ref] ? ` · ${ITEM[e.ref].name}` : ''}${['teacher_coins', 'teacher_praise', 'teacher_dice'].includes(e.kind) && e.ref ? ` · ${e.ref}` : ''}</td>
           <td class="right">${e.xp > 0 && html`<b>+${e.xp}</b>`}</td><td class="right coin-text">${e.coins ? (e.coins > 0 ? `+${e.coins}🪙` : `${e.coins}🪙`) : ''}</td></tr>`)}</table>
       </div>
     </section>

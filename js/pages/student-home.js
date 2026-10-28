@@ -1,6 +1,6 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
-import { Loading, ErrorBox, XPBar, fmtDate } from '../components/ui.js';
+import { Loading, ErrorBox, XPBar, fmtDate, subjectStyle } from '../components/ui.js';
 import { AvatarImg } from '../components/avatar-ui.js';
 import { GroupedLessons } from '../components/grouped.js';
 import { loadCatalog } from '../lib/groups.js';
@@ -89,7 +89,7 @@ export function StudentHome({ profile }) {
 
     ${fresh.length > 0 && html`<section>
       <h2>✨ 새로 올라온 수업</h2>
-      <div class="grid">${fresh.map((l) => html`<a class="card lesson-card new" href=${'#/lesson/' + l.id}>
+      <div class="grid">${fresh.map((l) => html`<a class="card lesson-card new" href=${'#/lesson/' + l.id} style=${subjectStyle(l.subject)}>
         <div class="badge-new">NEW</div>
         <div class="lesson-meta">${l.subject}${l.unit && ' · ' + l.unit}</div>
         <h3>${l.title}</h3>
@@ -105,12 +105,12 @@ export function StudentHome({ profile }) {
           const p = byLesson[l.id];
           const pct = p.total ? Math.round((p.done.size / p.total) * 100) : 0;
           const topic = data.topics.find((t) => t.id === l.topic_id);
-          return html`<div class="card lesson-card" key=${l.id}>
+          return html`<div class="card lesson-card" key=${l.id} style=${subjectStyle(l.subject)}>
             <div class="lesson-meta">${l.subject}${topic && ' · ' + topic.name} · ${fmtDate(l.lesson_date)}</div>
             <h3>${l.title} ${pct === 100 && '🏅'}</h3>
             <div class="progress"><div style=${`width:${pct}%`}></div></div>
             <div class="muted small">${p.done.size} / ${p.total} 문제 완료${p.wrong.size ? ` · 다시 풀 문제 ${p.wrong.size}개` : ''}</div>
-            <div class="btn-row">
+            <div class="lesson-actions">
               <a class="btn" href=${'#/lesson/' + l.id}>📖 복습</a>
               <a class="btn primary" href=${'#/quiz/' + l.id}>🎯 퀴즈</a>
               ${p.wrong.size > 0 && html`<a class="btn warn" href=${'#/quiz/' + l.id + '?wrong=1'}>💪 오답</a>`}

@@ -151,3 +151,13 @@ export function timeAgo(d) {
   if (s < 86400) return `${Math.floor(s / 3600)}시간 전`;
   return `${Math.floor(s / 86400)}일 전`;
 }
+
+// 과목마다 다른 색 (카드 위 띠·글자색). 자주 쓰는 과목은 정해 두고, 나머지는 이름으로 색을 골라요
+const SUBJECT_HUE = { 국어: 350, 수학: 230, '진로와 직업': 150, 과학: 190, 사회: 30, 영어: 270, 음악: 300, 미술: 10, 체육: 120 };
+export function subjectHue(name = '') {
+  const key = Object.keys(SUBJECT_HUE).find((k) => name.includes(k));
+  if (key) return SUBJECT_HUE[key];
+  let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return h;
+}
+export const subjectStyle = (name) => `--accent: hsl(${subjectHue(name)} 70% 55%); --accent-soft: hsl(${subjectHue(name)} 80% 96%)`;

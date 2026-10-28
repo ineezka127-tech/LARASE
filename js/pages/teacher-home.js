@@ -9,6 +9,7 @@ import { PraiseButton } from '../components/praise.js';
 import { fracToken } from '../lib/fraction.js';
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
+const accClass = (t) => { const n = parseInt(t, 10); return isNaN(n) ? 'none' : n >= 80 ? 'hi' : n >= 50 ? 'mid' : 'lo'; };
 
 export function TeacherHome() {
   const [d, setD] = useState(null);
@@ -52,18 +53,18 @@ export function TeacherHome() {
           <div><b>${s.display_name || '(이름 없음)'}</b><div class="muted small">${s.login_id}${s.grade ? ` · ${s.grade}학년` : ''}</div></div></div>
         <${XPBar} xp=${s.xp} compact />
         <div class="sc-stats">
-          <span>🔥 ${s.streak}일</span><span>🪙 ${s.coins ?? 0}</span>${(() => { const g = d.games.find((x) => x.user_id === s.id); return g ? html`<span>🎲 월드 ${g.world}</span>` : ''; })()}<span>이번 주 ${st.week}문제</span><span>정답률 ${st.acc}</span>
+          <span>🔥 ${s.streak}일</span><span>🪙 ${s.coins ?? 0}</span>${(() => { const g = d.games.find((x) => x.user_id === s.id); return g ? html`<span>🎲 월드 ${g.world}</span>` : ''; })()}<span>📝 이번 주 ${st.week}문제</span>
         </div>
-        <div class="muted small">마지막 활동: ${timeAgo(st.last)}</div>
+        <div class="sc-foot"><span class="muted small">마지막 활동: ${timeAgo(st.last)}</span><span class=${'acc-badge ' + accClass(st.acc)}>정답률 ${st.acc}</span></div>
     </a>`;
   };
 
   return html`<div class="page">
     <div class="action-row">
-      <a class="card action" href="#/t/lesson/new"><span>➕</span>새 수업 자료 만들기</a>
-      <a class="card action" href="#/t/grading"><span>📝</span>서술형 채점 ${d.pending > 0 && html`<b class="count">${d.pending}</b>`}</a>
-      <a class="card action" href="#/t/lessons"><span>📺</span>수업 모드 (TV)</a>
-      <${PraiseButton} className="card action praise-action" label=${html`<span>🎁</span>칭찬하기 (경험치·코인)`} />
+      <a class="card action" href="#/t/lesson/new"><span>➕</span><div>새 수업 자료<small>판서·PDF로 문제 만들기</small></div></a>
+      <a class="card action" href="#/t/grading"><span>📝</span><div>서술형 채점 ${d.pending > 0 && html`<b class="count">${d.pending}</b>`}<small>${d.pending > 0 ? `${d.pending}개 기다려요` : '기다리는 답 없음'}</small></div></a>
+      <a class="card action" href="#/t/lessons"><span>📺</span><div>수업 모드<small>TV로 함께 풀기</small></div></a>
+      <${PraiseButton} className="card action praise-action" label=${html`<span>🎁</span><div>칭찬·약속<small>경험치·코인·주사위</small></div>`} />
     </div>
 
     <h2>👥 학생 현황 <small class="muted">(최근 30일)</small></h2>
@@ -82,7 +83,7 @@ export function TeacherHome() {
           return html`<tr>
             <td>${fmtDate(l.lesson_date)}</td><td><b>${l.title}</b> <span class="muted small">${l.subject}</span></td>
             <td>${l.published ? '✅' : '🙈'}</td><td>${viewers.size} / ${d.students.length}</td>
-            <td>${pct(at.filter((a) => a.is_correct).length, at.length)}</td>
+            <td>${(() => { const v = pct(at.filter((a) => a.is_correct).length, at.length); return html`<span class=${'acc-badge ' + accClass(v)}>${v}</span>`; })()}</td>
             <td class="right"><a class="btn small" href=${'#/t/lesson/' + l.id}>편집</a> <a class="btn small" href=${'#/class/' + l.id}>📺</a></td>
           </tr>`;
         })}
