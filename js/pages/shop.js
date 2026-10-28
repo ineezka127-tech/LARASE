@@ -19,7 +19,8 @@ export function canWear(item, owned, level) {
 }
 
 const FULL_SLOTS = ['top', 'bottom', 'shoes', 'held', 'shield', 'armor', 'acc', 'bg', 'pet'];
-const SHOP_SLOTS = Object.keys(SLOTS);
+const SHOP_SLOTS = [...Object.keys(SLOTS), 'hair', 'hairColor', 'eyes'];
+const EXTRA_LABEL = { hair: '💇 머리 모양', hairColor: '🎨 머리색', eyes: '👀 눈' };
 
 export function ShopPage({ profile, refreshProfile }) {
   const [owned, setOwned] = useState(null);
@@ -81,7 +82,7 @@ export function ShopPage({ profile, refreshProfile }) {
       <${StatPanel} profile=${profile} cfg=${preview} editable=${false} />
     </div>
 
-    <div class="tabs">${SHOP_SLOTS.map((s) => html`<button class=${'tab' + (slot === s ? ' on' : '')} onClick=${() => setSlot(s)}>${SLOTS[s]}</button>`)}</div>
+    <div class="tabs">${SHOP_SLOTS.map((s) => html`<button class=${'tab' + (slot === s ? ' on' : '')} onClick=${() => setSlot(s)}>${SLOTS[s] || EXTRA_LABEL[s]}</button>`)}</div>
 
     <div class="shop-grid">${items.map((it) => {
       const have = owned.has(it.id);

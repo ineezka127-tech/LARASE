@@ -13,9 +13,26 @@ export const NOSES = { dot: '작은 코', round: '동글 코', tri: '세모 코'
 export const MOUTHS = { smile: '미소', cat: '고양이 입', grin: '활짝', teeth: '이 보이게 웃기', o: '오!', tongue: '메롱', pout: '삐죽', flat: '무표정' };
 export const CHEEKS = { pink: '발그레', freckles: '주근깨', none: '없음' };
 export const HAIRS = { short: '짧은 머리', side: '옆가르마', bob: '단발', long: '긴 머리', ponytail: '포니테일', pigtails: '양갈래', spiky: '삐죽 머리', curly: '곱슬 머리', buzz: '까까머리' };
+export const BROW_COLORS = ['auto', '#2b2220', '#5a3825', '#8b5a2b', '#d9a441', '#a7adb4'];
+export const NOSE_COLORS = ['auto', '#e8a598', '#c97c62', '#8f5c3c', '#ff8fa3'];
+
+// 상점에서 사는 머리 모양·머리색·눈 (값 = 아이템 id)
+export const PREMIUM = {
+  hair: { ph_bun: '똥머리', ph_wavy: '웨이브 머리', ph_braid: '땋은 머리', ph_afro: '뽀글 아프로', ph_mohawk: '모히칸' },
+  hairColor: { hc_mint: '민트', hc_silver: '은빛', hc_fire: '불꽃', hc_rainbow: '무지개', hc_galaxy: '우주' },
+  eyes: { pe_heart: '하트 눈', pe_sparkle: '별빛 눈', pe_cat: '고양이 눈', pe_anime: '만화 눈' },
+};
+// 그라데이션 머리색: [대표색, 그라데이션 색들]
+const HC = {
+  hc_mint: ['#38d9a9', ['#63e6be', '#20c997']],
+  hc_silver: ['#adb5bd', ['#f1f3f5', '#adb5bd', '#868e96']],
+  hc_fire: ['#e8590c', ['#ffd43b', '#ff922b', '#e03131']],
+  hc_rainbow: ['#9775fa', ['#ff6b6b', '#ffd43b', '#69db7c', '#4dabf7', '#9775fa']],
+  hc_galaxy: ['#5f3dc4', ['#1c1a4a', '#5f3dc4', '#4dabf7']],
+};
 
 export const DEFAULT_AVATAR = {
-  face: 'round', skin: SKINS[1], eyes: 'dot', brows: 'soft', nose: 'dot', mouth: 'smile', cheek: 'pink',
+  face: 'round', skin: SKINS[1], eyes: 'dot', brows: 'soft', browColor: 'auto', nose: 'dot', noseColor: 'auto', mouth: 'smile', cheek: 'pink',
   hair: 'short', hairColor: HAIR_COLORS[0],
   top: 't_blue', bottom: 'b_navy', shoes: 's_white', hat: null, glasses: null, held: null, shield: null, armor: null, acc: null, bg: 'bg_sky', pet: null,
 };
@@ -85,6 +102,12 @@ export const ITEMS = [
   I('p_dog', 'pet', '강아지', 150, 2, 'common', { hp: 3 }), I('p_rabbit', 'pet', '토끼', 150, 3, 'common', { luck: 2 }),
   I('p_dino', 'pet', '공룡', 300, 6, 'rare', { atk: 2, hp: 2 }), I('p_unicorn', 'pet', '유니콘', 400, 9, 'epic', { luck: 4, hp: 2 }),
   I('p_dragon', 'pet', '아기 용', 600, 13, 'legend', { atk: 4, luck: 2 }),
+  // 상점 전용 머리 모양 · 머리색 · 눈
+  I('ph_bun', 'hair', '똥머리', 120, 1), I('ph_wavy', 'hair', '웨이브 머리', 150, 2), I('ph_braid', 'hair', '땋은 머리', 150, 3),
+  I('ph_afro', 'hair', '뽀글 아프로', 220, 4, 'rare'), I('ph_mohawk', 'hair', '모히칸', 260, 6, 'rare'),
+  I('hc_mint', 'hairColor', '민트 머리', 100, 1), I('hc_silver', 'hairColor', '은빛 머리', 160, 3, 'rare'), I('hc_fire', 'hairColor', '불꽃 머리', 240, 5, 'rare'),
+  I('hc_rainbow', 'hairColor', '무지개 머리', 380, 8, 'epic'), I('hc_galaxy', 'hairColor', '우주 머리', 520, 11, 'legend'),
+  I('pe_heart', 'eyes', '하트 눈', 90, 1), I('pe_sparkle', 'eyes', '별빛 눈', 140, 2), I('pe_cat', 'eyes', '고양이 눈', 180, 4, 'rare'), I('pe_anime', 'eyes', '만화 눈', 240, 6, 'rare'),
 ];
 export const ITEM = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
@@ -119,13 +142,15 @@ export function cleanCfg(cfg) {
   const out = {
     face: pick(c.face, Object.keys(FACES), 'round'),
     skin: pick(c.skin, SKINS, SKINS[1]),
-    eyes: pick(c.eyes, Object.keys(EYES), 'dot'),
+    eyes: pick(c.eyes, [...Object.keys(EYES), ...Object.keys(PREMIUM.eyes)], 'dot'),
     brows: pick(c.brows, Object.keys(BROWS), 'soft'),
+    browColor: pick(c.browColor, BROW_COLORS, 'auto'),
     nose: pick(c.nose, Object.keys(NOSES), 'dot'),
+    noseColor: pick(c.noseColor, NOSE_COLORS, 'auto'),
     mouth: pick(c.mouth, Object.keys(MOUTHS), 'smile'),
     cheek: pick(c.cheek, Object.keys(CHEEKS), 'pink'),
-    hair: pick(c.hair, Object.keys(HAIRS), 'short'),
-    hairColor: pick(c.hairColor, HAIR_COLORS, HAIR_COLORS[0]),
+    hair: pick(c.hair, [...Object.keys(HAIRS), ...Object.keys(PREMIUM.hair)], 'short'),
+    hairColor: pick(c.hairColor, [...HAIR_COLORS, ...Object.keys(PREMIUM.hairColor)], HAIR_COLORS[0]),
   };
   for (const s of Object.keys(SLOTS)) {
     out[s] = ITEM[c[s]]?.slot === s ? c[s] : (['top', 'bottom', 'shoes', 'bg'].includes(s) ? DEFAULT_AVATAR[s] : null);
@@ -202,45 +227,67 @@ function drawBack(c) {
 }
 
 // ---------- 머리카락 ----------
-// 바깥선은 머리(반지름 50)보다 6~8 크게 둘러서 정수리와 옆머리를 감쌉니다
+// 1) 정수리를 덮는 "머리 뚜껑"을 먼저 깔고  2) 스타일별 앞머리·옆머리를 올려요 → 빈틈(대머리) 없음
+// 바깥선은 머리(반지름 50)보다 6 크게 둘러요
 const HAIR_TOP = 'M44 94 C40 52 62 24 100 24 C138 24 160 52 156 94';
+const HAIR_CAP = `${HAIR_TOP} C153 82 148 72 140 66 C120 58 80 58 60 66 C52 72 47 82 44 94 Z`;
+const strands = (lines) => lines.map((d) => `<path d="${d}" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="2.2" stroke-linecap="round"/>`).join('');
 
-function hairBack(style, color) {
-  const s = `fill="${color}" ${SW}`;
+function hairBack(style, fill) {
+  const s = `fill="${fill}" ${SW}`;
   switch (style) {
     case 'long': return `<path d="M44 90 C40 50 62 24 100 24 C138 24 160 50 156 90 L162 172 C138 186 62 186 38 172 Z" ${s}/>`;
+    case 'ph_wavy': return `<path d="M44 90 C40 50 62 24 100 24 C138 24 160 50 156 90 C166 110 152 124 164 140 C174 156 158 172 160 182 C136 192 64 192 40 182 C42 172 26 156 36 140 C48 124 34 110 44 90 Z" ${s}/>`;
     case 'bob': return `<path d="M42 92 C38 50 62 22 100 22 C138 22 162 50 158 92 L160 128 C144 138 56 138 40 128 Z" ${s}/>`;
-    case 'ponytail': return `<path d="M136 44 C176 40 188 92 164 132 C170 100 160 74 140 66 Z" ${s}/>`;
+    case 'ponytail': return `<path d="M136 42 C178 38 190 92 166 134 C172 100 162 74 140 66 Z" ${s}/>`;
     case 'pigtails': return `<circle cx="44" cy="72" r="16" ${s}/><circle cx="156" cy="72" r="16" ${s}/>
       <path d="M38 86 C28 110 34 134 42 142 C46 122 50 106 52 90Z" ${s}/><path d="M162 86 C172 110 166 134 158 142 C154 122 150 106 148 90Z" ${s}/>`;
+    case 'ph_braid': return `<path d="M44 92 C40 50 62 24 100 24 C138 24 160 50 156 92 L154 112 C140 120 60 120 46 112 Z" ${s}/>`
+      + [0, 1, 2, 3, 4].map((i) => `<ellipse cx="${150 - i * 2}" cy="${118 + i * 16}" rx="11" ry="10" ${s}/>`).join('') + `<path d="M144 196 L152 196 L148 206 Z" fill="#ff6b9d" ${SW}/>`;
     case 'curly': return `<path d="M40 104 C34 50 62 20 100 20 C138 20 166 50 160 104 L158 120 C142 130 58 130 42 120 Z" ${s}/>`;
+    case 'ph_afro': return `<circle cx="100" cy="70" r="66" ${s}/>`;
     default: return '';
   }
 }
 
-function hairFront(style, color) {
-  const s = `fill="${color}" ${SW}`;
+function hairFront(style, fill) {
+  const s = `fill="${fill}" ${SW}`;
+  const cap = `<path d="${HAIR_CAP}" ${s}/>`;
   switch (style) {
-    case 'short': return `<path d="${HAIR_TOP} C152 74 140 62 124 62 C116 56 100 56 92 60 C78 56 62 62 54 72 C49 78 46 86 44 94 Z" ${s}/>`;
-    case 'side': return `<path d="${HAIR_TOP} C152 76 146 66 134 62 C112 64 86 60 70 46 C60 62 50 78 44 94 Z" ${s}/>`;
+    case 'short': return cap + `<path d="M56 74 C64 60 80 56 92 62 C100 54 114 54 124 62 C136 60 148 68 150 80 C140 70 128 68 120 72 C112 64 100 66 96 72 C86 66 72 66 56 74 Z" ${s}/>`
+      + strands(['M70 40 Q84 32 98 34', 'M112 34 Q126 36 136 46']);
+    case 'side': return cap + `<path d="M58 72 C74 56 100 50 128 56 C140 60 148 68 152 82 C140 70 124 66 108 70 C92 72 72 70 58 72 Z" ${s}/>`
+      + `<path d="M126 56 C136 70 142 80 146 94 C150 84 152 76 150 70" ${s}/>` + strands(['M66 42 Q90 30 118 38']);
     case 'bob':
     case 'long':
     case 'ponytail':
-    case 'pigtails': return `<path d="${HAIR_TOP} C152 78 146 66 134 60 C124 68 112 64 104 56 C94 66 78 66 70 58 C58 66 48 80 44 94 Z" ${s}/>`;
-    case 'spiky': return `<path d="M44 94 L38 52 L56 52 L58 22 L78 34 L90 10 L106 30 L120 12 L128 34 L146 22 L144 52 L162 52 L156 94 C146 70 124 62 100 62 C76 62 54 70 44 94 Z" ${s}/>`;
-    case 'curly': {
+    case 'pigtails':
+    case 'ph_wavy':
+    case 'ph_braid':
+      return cap + `<path d="M50 84 C52 66 64 56 78 54 C80 64 86 70 96 70 C98 62 102 58 106 56 C110 64 118 70 128 70 C130 62 134 58 138 58 C148 64 152 74 152 86 C146 76 140 72 134 72 C126 78 110 76 104 70 C96 78 82 78 76 70 C66 72 56 78 50 84 Z" ${s}/>`
+        + `<path d="M46 92 C44 100 46 110 50 116 C50 104 52 96 56 88 Z" ${s}/><path d="M154 92 C156 100 154 110 150 116 C150 104 148 96 144 88 Z" ${s}/>`
+        + strands(['M70 40 Q86 32 100 32', 'M116 34 Q132 38 140 50']);
+    case 'spiky': return `<path d="M44 94 L38 52 L56 52 L58 22 L78 34 L90 10 L106 30 L120 12 L128 34 L146 22 L144 52 L162 52 L156 94 C150 80 144 72 136 66 C116 58 84 58 64 66 C56 72 50 80 44 94 Z" ${s}/>`
+        + `<path d="M58 72 L68 62 L76 70 L88 60 L98 68 L110 58 L120 68 L132 60 L140 70 L146 80 C130 70 74 70 58 72 Z" ${s}/>`;
+    case 'curly': case 'ph_afro': {
+      const R = style === 'ph_afro' ? 60 : 52;
       const bumps = [];
-      for (let i = 0; i <= 8; i++) {
-        const a = Math.PI + (i * Math.PI) / 8;
-        bumps.push([HX + 52 * Math.cos(a), HY - 4 + 52 * Math.sin(a)]);
+      for (let i = 0; i <= 9; i++) {
+        const a = Math.PI + (i * Math.PI) / 9;
+        bumps.push([HX + R * Math.cos(a), HY - 6 + R * Math.sin(a)]);
       }
-      return `<path d="${HAIR_TOP} C140 68 60 68 44 94 Z" fill="${color}"/>`
-        + [...bumps, [78, 58], [100, 54], [122, 58]].map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${color}" stroke="${OUT}" stroke-width="2"/>`).join('');
+      return cap + bumps.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${style === 'ph_afro' ? 16 : 13}" fill="${fill}" stroke="${OUT}" stroke-width="2"/>`).join('')
+        + [[66, 66], [84, 60], [100, 58], [116, 60], [134, 66]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="11" fill="${fill}" stroke="${OUT}" stroke-width="2"/>`).join('');
     }
-    case 'buzz': return `<path d="M48 84 C46 50 66 30 100 30 C134 30 154 50 152 84 C134 66 66 66 48 84 Z" fill="${color}" opacity="0.85" ${SW}/>`;
-    default: return '';
+    case 'ph_bun': return `<circle cx="100" cy="14" r="18" ${s}/><path d="M86 22 Q100 30 114 22" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>` + hairFront('long', fill);
+    case 'ph_mohawk': return `<path d="${HAIR_CAP}" fill="${fill}" opacity="0.35"/><path d="M84 66 C80 40 86 6 100 -6 C114 6 120 40 116 66 C108 60 92 60 84 66 Z" ${s}/>` + strands(['M100 0 L100 56']);
+    case 'buzz': return `<path d="M48 84 C46 50 66 30 100 30 C134 30 154 50 152 84 C134 66 66 66 48 84 Z" fill="${fill}" opacity="0.85" ${SW}/>`;
+    default: return cap;
   }
 }
+
+// 모자·투구를 쓰면 이 높이 위쪽 머리카락은 숨겨요 (모자 밖으로 튀어나오지 않게)
+const HAT_CUT = { h_cap: 60, h_beanie: 64, h_leather: 58, h_iron: 58, h_knight: 60, h_dragon: 60, h_wizard: 56 };
 
 // ---------- 얼굴 ----------
 function headShape(face, skin) {
@@ -271,12 +318,17 @@ function drawEyes(style) {
     case 'sleepy': return EX.map((x) => `<path d="M${x - 6} ${Y} Q${x} ${Y + 5} ${x + 6} ${Y}" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>`).join('');
     case 'cool': return EX.map((x) => `<path d="M${x - 7} ${Y - 2} L${x + 7} ${Y - 2}" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/><path d="M${x - 5} ${Y - 2} Q${x} ${Y + 7} ${x + 5} ${Y - 2} Z" fill="${OUT}"/>`).join('');
     case 'star': return EX.map((x) => star(x, Y, 8, '#ffb703', `stroke="${OUT}" stroke-width="1.5"`)).join('');
+    case 'pe_heart': return EX.map((x) => `<path d="M${x} ${Y + 7} C${x - 11} ${Y} ${x - 8} ${Y - 9} ${x} ${Y - 4} C${x + 8} ${Y - 9} ${x + 11} ${Y} ${x} ${Y + 7} Z" fill="#f03e3e" ${SW}/><circle cx="${x - 3}" cy="${Y - 3}" r="1.6" fill="#fff"/>`).join('');
+    case 'pe_sparkle': return EX.map((x) => `<ellipse cx="${x}" cy="${Y}" rx="7.5" ry="9.5" fill="#1c1a4a"/><ellipse cx="${x}" cy="${Y + 3}" rx="5.5" ry="5" fill="#5f3dc4" opacity="0.8"/>${star(x + 2.5, Y - 3, 3.6, '#fff')}<circle cx="${x - 2.5}" cy="${Y + 4}" r="1.4" fill="#fff"/>`).join('');
+    case 'pe_cat': return EX.map((x) => `<ellipse cx="${x}" cy="${Y}" rx="7" ry="8" fill="#ffd43b" ${SW}/><ellipse cx="${x}" cy="${Y}" rx="1.8" ry="6.5" fill="${OUT}"/>`).join('');
+    case 'pe_anime': return EX.map((x) => `<ellipse cx="${x}" cy="${Y}" rx="8.5" ry="10.5" fill="#fff" ${SW}/><ellipse cx="${x + 0.5}" cy="${Y + 1.5}" rx="6" ry="8" fill="#1c7ed6"/><circle cx="${x + 0.5}" cy="${Y + 2}" r="3.5" fill="${OUT}"/><circle cx="${x + 3}" cy="${Y - 3}" r="2.4" fill="#fff"/><path d="M${x - 9} ${Y - 9} Q${x} ${Y - 14} ${x + 9} ${Y - 9}" fill="none" stroke="${OUT}" stroke-width="2.8" stroke-linecap="round"/>`).join('');
     default: return EX.map((x) => `<ellipse cx="${x}" cy="${Y}" rx="4" ry="5.5" fill="${OUT}"/><circle cx="${x + 1.4}" cy="${Y - 2}" r="1.5" fill="#fff"/>`).join('');
   }
 }
 
-function drawBrows(style, hairColor) {
-  const col = hairColor === '#f3d572' || hairColor === '#a7adb4' ? '#8b6b3b' : OUT;
+function drawBrows(style, hairColor, browColor) {
+  const base = HC[hairColor]?.[0] || hairColor;
+  const col = browColor && browColor !== 'auto' ? browColor : base === '#f3d572' || base === '#a7adb4' ? '#8b6b3b' : OUT;
   const Y = EY - 13;
   const line = (d, w = 2.6) => `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`;
   switch (style) {
@@ -288,8 +340,8 @@ function drawBrows(style, hairColor) {
   }
 }
 
-function drawNose(style, skin) {
-  const shade = shadeColor(skin, 0.22);
+function drawNose(style, skin, noseColor) {
+  const shade = noseColor && noseColor !== 'auto' ? noseColor : shadeColor(skin, 0.22);
   switch (style) {
     case 'round': return `<ellipse cx="100" cy="100" rx="5" ry="4" fill="${shade}"/>`;
     case 'tri': return `<path d="M96 101 L104 101 L100 96 Z" fill="${shade}" stroke="${shade}" stroke-width="1.5" stroke-linejoin="round"/>`;
@@ -490,13 +542,25 @@ function drawPet(id) {
 }
 
 // ---------- 전체 조립 ----------
+let svgSeq = 0;
 export function avatarSvg(cfgIn, mode = 'full') {
   const c = cleanCfg(cfgIn);
+  const uid = 'av' + (++svgSeq).toString(36) + Math.random().toString(36).slice(2, 6);
+  let defs = '';
+  let hairFill = c.hairColor;
+  if (HC[c.hairColor]) {
+    const cols = HC[c.hairColor][1];
+    defs += `<linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1">${cols.map((col, i) => `<stop offset="${(i / (cols.length - 1)) * 100}%" stop-color="${col}"/>`).join('')}</linearGradient>`;
+    hairFill = `url(#${uid}g)`;
+  }
+  const cut = HAT_CUT[c.hat];
+  if (cut) defs += `<clipPath id="${uid}c"><rect x="-40" y="${cut}" width="280" height="400"/></clipPath>`;
+  const hairWrap = (svg) => (cut && svg ? `<g clip-path="url(#${uid}c)">${svg}</g>` : svg);
   const view = mode === 'portrait' ? '28 -6 144 144' : '0 -10 200 274';
   const parts = [
     drawBg(c.bg),
     drawBack(c),
-    hairBack(c.hair, c.hairColor),
+    hairWrap(hairBack(c.hair, hairFill)),
     `<ellipse cx="100" cy="256" rx="44" ry="6" fill="rgba(0,0,0,0.12)"/>`,
     drawLegs(c.bottom, c.skin),
     drawShoes(c.shoes),
@@ -507,16 +571,16 @@ export function avatarSvg(cfgIn, mode = 'full') {
     drawAccFront(c.acc),
     headShape(c.face, c.skin),
     drawCheeks(c.cheek),
-    drawBrows(c.brows, c.hairColor),
+    drawBrows(c.brows, c.hairColor, c.browColor),
     drawEyes(c.eyes),
-    drawNose(c.nose, c.skin),
+    drawNose(c.nose, c.skin, c.noseColor),
     drawMouth(c.mouth),
-    hairFront(c.hair, c.hairColor),
+    hairWrap(hairFront(c.hair, hairFill)),
     drawGlasses(c.glasses),
     drawHat(c.hat),
     drawShield(c.shield),
     drawHeld(c.held),
     drawPet(c.pet),
   ];
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${view}" role="img" aria-label="아바타">${parts.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${view}" role="img" aria-label="아바타">${defs ? `<defs>${defs}</defs>` : ''}${parts.join('')}</svg>`;
 }

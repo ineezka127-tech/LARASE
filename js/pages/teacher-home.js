@@ -5,6 +5,7 @@ import { Loading, ErrorBox, XPBar, fmtDate, timeAgo } from '../components/ui.js'
 import { RichText } from '../components/math.js';
 import { AvatarImg } from '../components/avatar-ui.js';
 import { GiveCoins } from '../components/give-coins.js';
+import { PraiseButton } from '../components/praise.js';
 import { fracToken } from '../lib/fraction.js';
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
@@ -16,15 +17,16 @@ export function TeacherHome() {
   useEffect(() => {
     (async () => {
       const since = new Date(Date.now() - 30 * 86400000).toISOString();
-      const [p, a, e, l, pend] = await Promise.all([
+      const [p, a, e, l, pend, games] = await Promise.all([
         sb.from('profiles').select('*').eq('role', 'student').order('login_id'),
         sb.from('attempts').select('user_id,lesson_id,question_id,is_correct,created_at').gte('created_at', since),
         sb.from('events').select('user_id,kind,ref,created_at').gte('created_at', since).order('created_at', { ascending: false }),
         sb.from('lessons').select('id,title,subject,published,lesson_date').order('lesson_date', { ascending: false }).limit(8),
         sb.from('attempts').select('id', { count: 'exact', head: true }).is('graded_at', null).is('is_correct', null),
+        sb.from('game_state').select('user_id,world,tile,deaths'),
       ]);
       for (const r of [p, a, e, l, pend]) if (r.error) throw r.error;
-      setD({ students: p.data, attempts: a.data, events: e.data, lessons: l.data, pending: pend.count || 0 });
+      setD({ students: p.data, attempts: a.data, events: e.data, lessons: l.data, pending: pend.count || 0, games: games.error ? [] : games.data });
     })().catch((x) => setErr(friendlyError(x)));
   }, []);
 
@@ -45,6 +47,7 @@ export function TeacherHome() {
       <a class="card action" href="#/t/lesson/new"><span>➕</span>새 수업 자료 만들기</a>
       <a class="card action" href="#/t/grading"><span>📝</span>서술형 채점 ${d.pending > 0 && html`<b class="count">${d.pending}</b>`}</a>
       <a class="card action" href="#/t/lessons"><span>📺</span>수업 모드 (TV)</a>
+      <${PraiseButton} className="card action praise-action" label=${html`<span>🎁</span>칭찬하기 (경험치·코인)`} />
     </div>
 
     <h2>👥 학생 현황 <small class="muted">(최근 30일)</small></h2>
@@ -56,7 +59,7 @@ export function TeacherHome() {
           <div><b>${s.display_name || '(이름 없음)'}</b><div class="muted small">${s.login_id}${s.grade ? ` · ${s.grade}학년` : ''}</div></div></div>
         <${XPBar} xp=${s.xp} compact />
         <div class="sc-stats">
-          <span>🔥 ${s.streak}일</span><span>🪙 ${s.coins ?? 0}</span><span>이번 주 ${st.week}문제</span><span>정답률 ${st.acc}</span>
+          <span>🔥 ${s.streak}일</span><span>🪙 ${s.coins ?? 0}</span>${(() => { const g = d.games.find((x) => x.user_id === s.id); return g ? html`<span>🎲 월드 ${g.world}</span>` : ''; })()}<span>이번 주 ${st.week}문제</span><span>정답률 ${st.acc}</span>
         </div>
         <div class="muted small">마지막 활동: ${timeAgo(st.last)}</div>
       </a>`;

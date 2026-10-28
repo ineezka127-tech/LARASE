@@ -5,6 +5,7 @@ import { signedUrls } from '../lib/files.js';
 import { answerText, TYPES, DIFFICULTY } from '../lib/questions.js';
 import { Loading, ErrorBox, SpeakBtn, shuffle } from '../components/ui.js';
 import { RichText } from '../components/math.js';
+import { PraiseButton } from '../components/praise.js';
 
 const NUMS = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
 
@@ -92,6 +93,7 @@ export function ClassMode({ lessonId }) {
       <span class="cm-progress">${i + 1} / ${slides.length}</span>
       <label class="cm-opt"><input type="checkbox" checked=${opts.pages} onChange=${(e) => { setOpts({ ...opts, pages: e.target.checked }); setI(0); }} /> 판서</label>
       <label class="cm-opt"><input type="checkbox" checked=${opts.cards} onChange=${(e) => { setOpts({ ...opts, cards: e.target.checked }); setI(0); }} /> 낱말 카드</label>
+      <${PraiseButton} className="cm-btn praise" label="🎁 칭찬" />
       <button class="cm-btn" onClick=${fullscreen}>⛶ 전체 화면</button>
     </div>
     <div class="cm-stage" key=${i}>${body}</div>

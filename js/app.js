@@ -9,12 +9,14 @@ import { MePage } from './pages/me.js';
 import { AvatarPage } from './pages/avatar.js';
 import { ShopPage } from './pages/shop.js';
 import { AvatarImg } from './components/avatar-ui.js';
+import { PraiseButton } from './components/praise.js';
 import { TeacherHome, StudentDetail } from './pages/teacher-home.js';
 import { LessonList, LessonEditor } from './pages/teacher-lessons.js';
 import { GradingPage } from './pages/grading.js';
 import { StudentsPage } from './pages/teacher-students.js';
 import { ClassMode } from './pages/classmode.js';
 import { SubjectsPage } from './pages/teacher-subjects.js';
+import { GamePage } from './pages/game.js';
 
 const APP_NAME = window.APP_CONFIG?.APP_NAME || '복습 교실';
 
@@ -43,10 +45,10 @@ function Header({ profile }) {
     <nav>
       ${teacher
         ? html`${link('#/', '📊 현황')}${link('#/t/lessons', '📚 수업 자료')}${link('#/t/grading', '📝 채점')}${link('#/t/students', '👥 학생')}`
-        : html`${link('#/', '🏠 홈')}${link('#/avatar', '🧑‍🎨 꾸미기')}${link('#/shop', '🛍️ 상점')}${link('#/me', '🙋 내 정보')}`}
+        : html`${link('#/', '🏠 홈')}${link('#/game', '🎲 모험')}${link('#/avatar', '🧑‍🎨 꾸미기')}${link('#/shop', '🛍️ 상점')}${link('#/me', '🙋 내 정보')}`}
     </nav>
     ${teacher
-      ? html`<button class="btn small ghost" onClick=${() => sb.auth.signOut()}>로그아웃</button>`
+      ? html`<${PraiseButton} className="btn small good" label="🎁 칭찬" /><button class="btn small ghost" onClick=${() => sb.auth.signOut()}>로그아웃</button>`
       : html`<a class="me-chip" href="#/me"><${AvatarImg} cfg=${profile.avatar_cfg} size=${40} /><span class="me-chip-body"><${XPBar} xp=${profile.xp} compact /><span class="coin-chip">🪙 ${profile.coins ?? 0}</span></span></a>`}
   </header>`;
 }
@@ -101,6 +103,7 @@ function App() {
   if (p0 === 'lesson') page = html`<${LessonView} key=${p1} lessonId=${p1} ...${ctx} />`;
   else if (p0 === 'quiz') page = html`<${QuizPage} key=${route.parts.join('/') + JSON.stringify(route.query)} source=${p1 === 'topic' ? { topic: route.parts[2] } : p1 === 'range' ? { range: route.query } : { lesson: p1 }} ...${ctx} />`;
   else if (p0 === 'me' && !teacher) page = html`<${MePage} ...${ctx} />`;
+  else if (p0 === 'game') page = html`<${GamePage} ...${ctx} />`;
   else if (p0 === 'avatar' && !teacher) page = html`<${AvatarPage} ...${ctx} />`;
   else if (p0 === 'shop' && !teacher) page = html`<${ShopPage} ...${ctx} />`;
   else if (teacher && p0 === 't') {

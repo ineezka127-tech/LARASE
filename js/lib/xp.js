@@ -1,8 +1,11 @@
 // 경험치·레벨·배지 규칙 (supabase 의 xp_need / level_for_xp 와 같은 공식)
-// 레벨 L → L+1 에 필요한 경험치 = 40 × L^1.4 (5 단위 반올림): 40, 105, 185, 280, 380 … 1005(Lv10)
+// 레벨 L → L+1 에 필요한 경험치 = 40 × L^1.4 (5 단위 반올림)
+// 레벨 5·10·15… 로 올라가는 길은 고개(×1.2): 대신 그 레벨에 오르면 보너스 코인 +50과 새 칭호
+//   40, 105, 185, 335(Lv4→5), 380 … 1005(Lv10→11)
 export function needFor(level) {
-  return Math.round((40 * Math.pow(level, 1.4)) / 5) * 5;
+  return Math.round((40 * Math.pow(level, 1.4) * (level % 5 === 4 ? 1.2 : 1)) / 5) * 5;
 }
+export const isMilestone = (level) => level % 5 === 0;
 
 export function levelInfo(xp) {
   let level = 1;
@@ -16,8 +19,8 @@ export function levelInfo(xp) {
 }
 
 export const LEVEL_TITLES = [
-  [1, '새싹 탐험가'], [3, '씩씩한 모험가'], [5, '지혜의 기사'], [8, '빛나는 마법사'],
-  [12, '전설의 용사'], [16, '복습 마스터'], [20, '기억의 왕'],
+  [1, '새싹 탐험가'], [5, '씩씩한 모험가'], [10, '지혜의 기사'], [15, '빛나는 마법사'],
+  [20, '전설의 용사'], [25, '복습 마스터'], [30, '기억의 왕'],
 ];
 
 export function levelTitle(level) {

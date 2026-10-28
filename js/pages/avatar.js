@@ -36,11 +36,12 @@ export function AvatarPage({ profile, refreshProfile }) {
   const cur = tabs.find((t) => t[0] === tab);
   const isItem = !!SLOTS[tab];
 
-  const lockedInfo = isItem ? (id) => {
+  // 아이템 칸 + 상점 전용 머리·머리색·눈은 가진 것만
+  const lockedInfo = (id) => {
     const it = ITEM[id];
     if (!it || canWear(it, owned, profile.level)) return null;
     return profile.level < it.level ? `🔒Lv.${it.level}` : `🪙${it.price}`;
-  } : null;
+  };
 
   const pick = (v, lock) => {
     if (lock) { toast('🛍️ 상점에서 살 수 있어요!'); return; }
@@ -74,7 +75,7 @@ export function AvatarPage({ profile, refreshProfile }) {
         <div class="tab-group-label">옷장</div>
         <div class="tabs small-tabs">${Object.entries(SLOTS).map(([k, label]) => html`<button class=${'tab' + (tab === k ? ' on' : '')} onClick=${() => setTab(k)}>${label}</button>`)}</div>
         <div class="card"><${OptionGrid} cfg=${cfg} slot=${tab} options=${cur[2]} onPick=${pick} lockedInfo=${lockedInfo} /></div>
-        ${isItem && html`<p class="muted small">🔒 표시는 상점에서 사거나 레벨을 올리면 입을 수 있어요. <a href="#/shop" onClick=${(e) => { e.preventDefault(); go('#/shop'); }}>상점 가기 →</a></p>`}
+        ${(isItem || ['hair', 'hairColor', 'eyes'].includes(tab)) && html`<p class="muted small">🔒 표시는 상점에서 사거나 레벨을 올리면 입을 수 있어요. <a href="#/shop" onClick=${(e) => { e.preventDefault(); go('#/shop'); }}>상점 가기 →</a></p>`}
       </div>
     </div>
   </div>`;

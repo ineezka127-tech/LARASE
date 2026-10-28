@@ -1,6 +1,6 @@
 // 아바타 보여 주기 · 꾸미기 화면 부품
 import { html, useMemo, useState } from '../../vendor/preact-htm.js';
-import { avatarSvg, cleanCfg, FACES, SKINS, EYES, BROWS, NOSES, MOUTHS, CHEEKS, HAIRS, HAIR_COLORS, ITEMS, ITEM, SLOTS, STATS, RARITY, totalStats, gearStats, power } from '../lib/avatar.js';
+import { avatarSvg, cleanCfg, FACES, SKINS, EYES, BROWS, NOSES, MOUTHS, CHEEKS, HAIRS, HAIR_COLORS, BROW_COLORS, NOSE_COLORS, PREMIUM, ITEMS, ITEM, SLOTS, STATS, RARITY, totalStats, gearStats, power } from '../lib/avatar.js';
 import { rpc, friendlyError } from '../lib/sb.js';
 import { toast } from './ui.js';
 
@@ -15,24 +15,34 @@ export function AvatarImg({ cfg, mode = 'portrait', size = 48, className = '' })
 export const BASIC_TABS = [
   ['face', '얼굴형', Object.entries(FACES)],
   ['skin', '피부색', SKINS.map((c) => [c, ''])],
-  ['eyes', '눈', Object.entries(EYES)],
+  ['eyes', '눈', [...Object.entries(EYES), ...Object.entries(PREMIUM.eyes)]],
   ['brows', '눈썹', Object.entries(BROWS)],
+  ['browColor', '눈썹 색', BROW_COLORS.map((c) => [c, ''])],
   ['nose', '코', Object.entries(NOSES)],
+  ['noseColor', '코 색', NOSE_COLORS.map((c) => [c, ''])],
   ['mouth', '입', Object.entries(MOUTHS)],
   ['cheek', '볼', Object.entries(CHEEKS)],
-  ['hair', '머리 모양', Object.entries(HAIRS)],
-  ['hairColor', '머리색', HAIR_COLORS.map((c) => [c, ''])],
+  ['hair', '머리 모양', [...Object.entries(HAIRS), ...Object.entries(PREMIUM.hair)]],
+  ['hairColor', '머리색', [...HAIR_COLORS, ...Object.keys(PREMIUM.hairColor)].map((c) => [c, ''])],
 ];
 
-const COLOR_KEYS = ['skin', 'hairColor'];
+const COLOR_KEYS = ['skin', 'hairColor', 'browColor', 'noseColor'];
+const SWATCH = {
+  hc_mint: 'linear-gradient(135deg,#63e6be,#20c997)', hc_silver: 'linear-gradient(135deg,#f1f3f5,#868e96)', hc_fire: 'linear-gradient(135deg,#ffd43b,#e03131)',
+  hc_rainbow: 'linear-gradient(135deg,#ff6b6b,#ffd43b,#69db7c,#4dabf7,#9775fa)', hc_galaxy: 'linear-gradient(135deg,#1c1a4a,#5f3dc4,#4dabf7)',
+};
 const FULL_SLOTS = ['top', 'bottom', 'shoes', 'held', 'shield', 'armor', 'acc', 'bg', 'pet'];
 
 // 하나의 탭에서 고르는 칸들
 export function OptionGrid({ cfg, slot, options, onPick, lockedInfo }) {
   const cur = cleanCfg(cfg)[slot];
   if (COLOR_KEYS.includes(slot)) {
-    return html`<div class="swatches">${options.map(([c]) => html`
-      <button type="button" class=${'swatch' + (cur === c ? ' on' : '')} style=${`background:${c}`} aria-label="색" onClick=${() => onPick(c)}></button>`)}</div>`;
+    return html`<div class="swatches">${options.map(([c]) => {
+      const lock = lockedInfo?.(c);
+      return html`<button type="button" class=${'swatch' + (cur === c ? ' on' : '') + (c === 'auto' ? ' auto' : '') + (lock ? ' locked' : '')}
+        style=${`background:${SWATCH[c] || (c === 'auto' ? '#fff' : c)}`} aria-label="색" title=${ITEM[c]?.name || ''} onClick=${() => onPick(c, lock)}>
+        ${c === 'auto' ? '자동' : ''}${lock && html`<span class="opt-lock">${lock}</span>`}</button>`;
+    })}</div>`;
   }
   const mode = FULL_SLOTS.includes(slot) ? 'full' : 'portrait';
   return html`<div class=${'opt-grid ' + mode}>${options.map(([value, label]) => {
