@@ -26,7 +26,10 @@ export function TeacherHome() {
         sb.from('game_state').select('user_id,world,tile,deaths'),
       ]);
       for (const r of [p, a, e, l, pend]) if (r.error) throw r.error;
-      setD({ students: p.data, attempts: a.data, events: e.data, lessons: l.data, pending: pend.count || 0, games: games.error ? [] : games.data });
+      // 🧪 테스트 계정은 현황·정답률에서 빼요
+      const tests = p.data.filter((x) => x.is_test);
+      const testIds = new Set(tests.map((x) => x.id));
+      setD({ students: p.data.filter((x) => !x.is_test), tests, attempts: a.data.filter((x) => !testIds.has(x.user_id)), events: e.data.filter((x) => !testIds.has(x.user_id)), lessons: l.data, pending: pend.count || 0, games: games.error ? [] : games.data });
     })().catch((x) => setErr(friendlyError(x)));
   }, []);
 
@@ -42,6 +45,19 @@ export function TeacherHome() {
     return { week: week.length, acc: pct(graded.filter((a) => a.is_correct).length, graded.length), last: last?.created_at };
   };
 
+  const card = (s) => {
+    const st = stat(s.id);
+    return html`<a class="card student-card" href=${'#/t/student/' + s.id}>
+        <div class="sc-head"><${AvatarImg} cfg=${s.avatar_cfg} size=${52} />
+          <div><b>${s.display_name || '(이름 없음)'}</b><div class="muted small">${s.login_id}${s.grade ? ` · ${s.grade}학년` : ''}</div></div></div>
+        <${XPBar} xp=${s.xp} compact />
+        <div class="sc-stats">
+          <span>🔥 ${s.streak}일</span><span>🪙 ${s.coins ?? 0}</span>${(() => { const g = d.games.find((x) => x.user_id === s.id); return g ? html`<span>🎲 월드 ${g.world}</span>` : ''; })()}<span>이번 주 ${st.week}문제</span><span>정답률 ${st.acc}</span>
+        </div>
+        <div class="muted small">마지막 활동: ${timeAgo(st.last)}</div>
+    </a>`;
+  };
+
   return html`<div class="page">
     <div class="action-row">
       <a class="card action" href="#/t/lesson/new"><span>➕</span>새 수업 자료 만들기</a>
@@ -52,18 +68,9 @@ export function TeacherHome() {
 
     <h2>👥 학생 현황 <small class="muted">(최근 30일)</small></h2>
     ${d.students.length === 0 && html`<div class="card empty">학생 계정이 없어요. <a href="#/t/students">학생 계정 만들기 →</a></div>`}
-    <div class="grid">${d.students.map((s) => {
-      const st = stat(s.id);
-      return html`<a class="card student-card" href=${'#/t/student/' + s.id}>
-        <div class="sc-head"><${AvatarImg} cfg=${s.avatar_cfg} size=${52} />
-          <div><b>${s.display_name || '(이름 없음)'}</b><div class="muted small">${s.login_id}${s.grade ? ` · ${s.grade}학년` : ''}</div></div></div>
-        <${XPBar} xp=${s.xp} compact />
-        <div class="sc-stats">
-          <span>🔥 ${s.streak}일</span><span>🪙 ${s.coins ?? 0}</span>${(() => { const g = d.games.find((x) => x.user_id === s.id); return g ? html`<span>🎲 월드 ${g.world}</span>` : ''; })()}<span>이번 주 ${st.week}문제</span><span>정답률 ${st.acc}</span>
-        </div>
-        <div class="muted small">마지막 활동: ${timeAgo(st.last)}</div>
-      </a>`;
-    })}</div>
+    <div class="grid">${d.students.map((s) => card(s))}</div>
+    ${d.tests.length > 0 && html`<details class="card test-accounts"><summary><b>🧪 테스트 계정 ${d.tests.length}개</b> <small class="muted">— 현황·정답률·친구 목록에서 빠져요 (학생 관리에서 바꿀 수 있어요)</small></summary>
+      <div class="grid">${d.tests.map((s) => card(s))}</div></details>`}
 
     <h2>📚 최근 수업 <small class="muted">— 반 전체 정답률</small></h2>
     <div class="card">
