@@ -101,11 +101,12 @@ export function LessonView({ lessonId, profile }) {
     ${tab === 'pages' && html`<${PageImages} paths=${lesson.pages} />`}
 
     ${qs.length > 0 && html`<div class="sticky-cta">
-      <button class="btn huge primary block" onClick=${() => setPick(true)}>🎯 퀴즈 풀러 가기 (${qs.length}문제)</button>
+      <button class="btn huge primary block" onClick=${() => setPick(true)}>🎯 퀴즈 풀러 가기 ${profile?.role === 'teacher' ? html`<small>(전체 ${qs.length}문제)</small>` : html`<small>(한 번에 ${Math.min(12, qs.length)}문제)</small>`}</button>
     </div>`}
 
     ${pick && html`<${Modal} onClose=${() => setPick(false)}>
       <h2>어떤 문제를 풀까요?</h2>
+      ${profile?.role !== 'teacher' && mineQs.length < qs.length && html`<p class="muted small">${myTier} 그룹 문제 ${mineQs.length}개${mineQs.some((q) => !q.tier) ? ' (공통 문제 포함)' : ''} 중에서 나와요</p>`}
       <div class="pick-list">
         <a class="btn big primary block" href=${'#/quiz/' + lessonId}>🎯 나에게 맞춰 풀기 <small>(맞히면 점점 어려워져요)</small></a>
         ${[1, 2, 3, 4].filter((d) => counts[d]).map((d) => html`<a class="btn big block" href=${`#/quiz/${lessonId}?d=${d}`}>
