@@ -1689,3 +1689,17 @@ insert into public.shop_items (id, slot, name, price, min_level, rarity, atk, de
   ('pe_anime', 'eyes', '만화 눈', 240, 6, 'rare', 0, 0, 0, 0)
 on conflict (id) do update set slot = excluded.slot, name = excluded.name, price = excluded.price, min_level = excluded.min_level,
   rarity = excluded.rarity, atk = excluded.atk, def = excluded.def, hp = excluded.hp, luck = excluded.luck, active = true;
+
+-- 모험 지도에서 친구들 위치 보기 (업데이트 7)
+create or replace function public.game_others() returns table (
+  user_id uuid, display_name text, avatar_cfg jsonb, level int, world int, tile int
+)
+language sql stable security definer set search_path = public as $$
+  select p.id, p.display_name, p.avatar_cfg, p.level, coalesce(g.world, 1), coalesce(g.tile, 0)
+    from profiles p
+    left join game_state g on g.user_id = p.id
+   where p.role = 'student' and p.id <> auth.uid() and auth.uid() is not null
+   order by p.login_id
+$$;
+revoke execute on function public.game_others() from public, anon;
+grant execute on function public.game_others() to authenticated;

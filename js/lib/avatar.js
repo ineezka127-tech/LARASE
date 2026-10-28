@@ -161,6 +161,7 @@ export function cleanCfg(cfg) {
 // ---------- 그리기 도우미 ----------
 const OUT = '#3a2f3b';
 const SW = 'stroke="#3a2f3b" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"';
+const SW24 = SW.replace('stroke-width="2.2"', 'stroke-width="2.4"');
 const star = (x, y, r, fill, extra = '') => {
   const p = [];
   for (let i = 0; i < 10; i++) {
@@ -353,14 +354,14 @@ function drawNose(style, skin, noseColor) {
 function drawMouth(style) {
   const Y = 110;
   switch (style) {
-    case 'cat': return `<path d="M91 ${Y - 1} Q95.5 ${Y + 5} 100 ${Y - 1} Q104.5 ${Y + 5} 109 ${Y - 1}" fill="none" ${SW} stroke-width="2.4"/>`;
+    case 'cat': return `<path d="M91 ${Y - 1} Q95.5 ${Y + 5} 100 ${Y - 1} Q104.5 ${Y + 5} 109 ${Y - 1}" fill="none" ${SW24}/>`;
     case 'grin': return `<path d="M90 ${Y - 3} L110 ${Y - 3} Q109 ${Y + 9} 100 ${Y + 9} Q91 ${Y + 9} 90 ${Y - 3} Z" fill="#b5373c" ${SW}/><path d="M94 ${Y + 4} Q100 ${Y + 1} 106 ${Y + 4} Q103 ${Y + 8} 100 ${Y + 8} Q97 ${Y + 8} 94 ${Y + 4}Z" fill="#ff8fa3"/>`;
     case 'teeth': return `<path d="M88 ${Y - 3} L112 ${Y - 3} Q110 ${Y + 10} 100 ${Y + 10} Q90 ${Y + 10} 88 ${Y - 3} Z" fill="#fff" ${SW}/><path d="M89 ${Y + 1} L111 ${Y + 1}" stroke="${OUT}" stroke-width="1.2"/>`;
     case 'o': return `<ellipse cx="100" cy="${Y + 1}" rx="4" ry="5" fill="#b5373c" ${SW}/>`;
-    case 'tongue': return `<path d="M92 ${Y - 1} Q100 ${Y + 6} 108 ${Y - 1}" fill="none" ${SW} stroke-width="2.4"/><path d="M97 ${Y + 2} Q97 ${Y + 10} 101 ${Y + 10} Q105 ${Y + 10} 104 ${Y + 2}" fill="#ff7b9c" ${SW}/>`;
-    case 'pout': return `<path d="M95 ${Y + 2} Q100 ${Y - 3} 105 ${Y + 2}" fill="none" ${SW} stroke-width="2.4"/>`;
-    case 'flat': return `<path d="M94 ${Y + 1} L106 ${Y + 1}" ${SW} stroke-width="2.4"/>`;
-    default: return `<path d="M93 ${Y - 1} Q100 ${Y + 6} 107 ${Y - 1}" fill="none" ${SW} stroke-width="2.4"/>`;
+    case 'tongue': return `<path d="M92 ${Y - 1} Q100 ${Y + 6} 108 ${Y - 1}" fill="none" ${SW24}/><path d="M97 ${Y + 2} Q97 ${Y + 10} 101 ${Y + 10} Q105 ${Y + 10} 104 ${Y + 2}" fill="#ff7b9c" ${SW}/>`;
+    case 'pout': return `<path d="M95 ${Y + 2} Q100 ${Y - 3} 105 ${Y + 2}" fill="none" ${SW24}/>`;
+    case 'flat': return `<path d="M94 ${Y + 1} L106 ${Y + 1}" ${SW24}/>`;
+    default: return `<path d="M93 ${Y - 1} Q100 ${Y + 6} 107 ${Y - 1}" fill="none" ${SW24}/>`;
   }
 }
 

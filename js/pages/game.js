@@ -18,29 +18,132 @@ function prepareMcq(q) {
 }
 
 // ---------- 지도 ----------
-function GameMap({ world, tile, defeated, choices, onChoose, avatarUri }) {
+const TILE_FILL = { mob: '#ffc9c9', elite: '#e599f7', boss: '#ff8787', chest: '#ffe066', trap: '#ffa94d', rest: '#96f2d7', gate: '#ced4da', island: '#99e9f2', start: '#fff', step: '#fff' };
+const LEGEND = ['start', 'mob', 'elite', 'boss', 'chest', 'trap', 'rest', 'gate', 'island', 'step'];
+const LEGEND_DESC = {
+  start: '여기서 출발해요', mob: '문제를 풀어 싸워요', elite: '센 몬스터! 물약·티켓을 줘요', boss: '물리치면 다음 지역으로!',
+  chest: '코인이나 물건이 나와요', trap: '체력이 조금 줄어요', rest: '체력 회복 + 저장', gate: '주사위 2개 합이 숫자 이상이면 통과',
+  island: '더블이 나오면 탈출', step: '그냥 길이에요',
+};
+const toUri = (cfg) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(avatarSvg(cfg, 'portrait'));
+
+// 월드마다 다른 꾸밈 (나무·꽃·돌 …)
+const DECOR = {
+  0: { big: ['🌳', '🌲', '🌳', '🌲'], small: ['🌷', '🌼', '🍄', '🌿', '🪨', '🌸'], sky: ['☁️'] },
+  1: { big: ['🪨', '💎', '🪨'], small: ['🕯️', '🦴', '💎', '🍄', '🕸️'], sky: ['🦇'] },
+  2: { big: ['🌲', '🪦', '🏚️'], small: ['🕯️', '🪦', '🦴', '🎃', '🕸️'], sky: ['🌙', '🦇'] },
+};
+const segDist = (px, py, a, b) => {
+  const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy;
+  const t = l ? Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / l)) : 0;
+  return Math.hypot(px - a.x - t * dx, py - a.y - t * dy);
+};
+function makeDecor(world, lines) {
+  let seed = world * 9301 + 49297;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const d = DECOR[(world - 1) % 3];
+  const out = [];
+  for (let gy = 52; gy < 610; gy += 52) {
+    for (let gx = 24; gx < 970; gx += 56) {
+      const x = gx + (rnd() - 0.5) * 34, y = gy + (rnd() - 0.5) * 30;
+      const big = rnd() < 0.45;
+      const size = big ? 30 + rnd() * 10 : 16 + rnd() * 6;
+      const near = Math.min(...MAP.map((t) => Math.hypot(t.x - x, t.y - y)));
+      const nearPath = Math.min(...lines.map(([a, b]) => segDist(x, y, a, b)));
+      if (near < 44 + size / 2 || nearPath < 18 + size / 2) continue;
+      if (rnd() < 0.35) continue;
+      const set = big ? d.big : d.small;
+      out.push({ x, y, size, e: set[Math.floor(rnd() * set.length)] });
+    }
+  }
+  return out.sort((p, q) => p.y - q.y);   // 아래에 있는 게 앞으로
+}
+
+function Token({ x, y, uri, r, me, name, color }) {
+  return html`<g class="token" style=${`transform: translate(${x}px, ${y}px)`}>
+    <ellipse cx="0" cy=${r + 4} rx=${r * 0.8} ry="4" fill="#000" opacity="0.18" />
+    <circle r=${r} fill="#fff" stroke=${color} stroke-width=${me ? 4 : 3} />
+    <image href=${uri} x=${-r + 2} y=${-r + 2} width=${(r - 2) * 2} height=${(r - 2) * 2} />
+    ${name && html`<g transform=${`translate(0, ${-r - 13})`}>
+      <rect x=${-name.length * 8 - 7} y="-12" width=${name.length * 16 + 14} height="23" rx="11.5" fill=${color} stroke="#fff" stroke-width="2" />
+      <text x="0" y="5" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">${name}</text></g>`}
+  </g>`;
+}
+
+function GameMap({ world, tile, defeated, choices, onChoose, onInfo, avatarUri, myName, friends }) {
   const w = worldInfo(world);
   const lines = [];
   MAP.forEach((t) => t.next.forEach((n) => lines.push([t, TILE[n]])));
+  const decor = useMemo(() => makeDecor(world, lines), [world]);
+  const wi = (world - 1) % 3;
+  // 같은 칸에 여러 명이 있으면 옆으로 비켜 서요
+  const here = {};
+  const people = [{ me: true, tile, uri: avatarUri, name: '나' }, ...friends.filter((f) => f.world === world).map((f) => ({ ...f, uri: f.uri }))];
+  people.forEach((p) => { (here[p.tile] ||= []).push(p); });
+  const placed = [];
+  Object.entries(here).forEach(([tid, ps]) => {
+    const t = TILE[tid] || TILE[0];
+    ps.forEach((p, i) => {
+      const off = (i - (ps.length - 1) / 2) * 60;
+      placed.push({ ...p, x: t.x + off, y: t.y - (p.me ? 36 : 30) });
+    });
+  });
+  placed.sort((a, b) => (a.me ? 1 : 0) - (b.me ? 1 : 0));   // 나는 맨 앞에
+
   return html`<svg class="game-map" viewBox="0 0 980 620" role="img" aria-label="모험 지도">
-    <defs><linearGradient id="gbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color=${w.bg[0]} /><stop offset="1" stop-color=${w.bg[1]} /></linearGradient></defs>
+    <defs>
+      <linearGradient id="gbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color=${w.bg[0]} /><stop offset="1" stop-color=${w.bg[1]} /></linearGradient>
+      <radialGradient id="glow"><stop offset="0" stop-color="#fff" stop-opacity="0.55" /><stop offset="1" stop-color="#fff" stop-opacity="0" /></radialGradient>
+    </defs>
     <rect x="0" y="0" width="980" height="620" rx="24" fill="url(#gbg)" />
-    ${lines.map(([a, b]) => html`<line x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y} stroke=${w.path} stroke-width="16" stroke-linecap="round" opacity="0.55" />`)}
+    ${wi === 0 && html`<g opacity="0.9">
+      <ellipse cx="250" cy="455" rx="70" ry="30" fill="#74c0fc" stroke="#4dabf7" stroke-width="4" />
+      <ellipse cx="235" cy="447" rx="22" ry="6" fill="#d0ebff" />
+      <ellipse cx="820" cy="610" rx="260" ry="60" fill="#8ce99a" opacity="0.6" />
+      <ellipse cx="120" cy="620" rx="220" ry="50" fill="#8ce99a" opacity="0.6" /></g>`}
+    ${wi === 1 && html`<g fill="#6d6491" opacity="0.55">${[40, 130, 260, 420, 610, 760, 940].map((x, i) => html`<path d=${`M${x - 26} 0 L${x + 26} 0 L${x} ${40 + (i % 3) * 22} Z`} />`)}
+      <ellipse cx="250" cy="455" rx="60" ry="24" fill="#5c4f8a" /></g>`}
+    ${wi === 2 && html`<g>
+      <circle cx="920" cy="40" r="60" fill="url(#glow)" />
+      <path d="M0 620 L0 600 Q120 560 240 600 Q380 560 520 600 Q680 560 820 600 Q900 575 980 600 L980 620 Z" fill="#7b5b8c" opacity="0.45" />
+      <ellipse cx="250" cy="455" rx="60" ry="24" fill="#9775fa" opacity="0.5" /></g>`}
+    ${lines.map(([a, b]) => html`<line x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y} stroke="#3a2f3b" stroke-opacity="0.18" stroke-width="30" stroke-linecap="round" />`)}
+    ${lines.map(([a, b]) => html`<line x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y} stroke=${w.path} stroke-width="22" stroke-linecap="round" />`)}
+    ${lines.map(([a, b]) => html`<line x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y} stroke="#fff" stroke-opacity="0.5" stroke-width="3" stroke-dasharray="2 12" stroke-linecap="round" />`)}
+    ${decor.map((d) => html`<text x=${d.x} y=${d.y} font-size=${d.size} text-anchor="middle" class="decor">${d.e}</text>`)}
     ${MAP.map((t) => {
-      const [icon] = TILE_INFO[t.type];
+      const [icon, label] = TILE_INFO[t.type];
       const done = defeated.includes(t.id);
       const isChoice = choices?.includes(t.id);
-      const fill = { mob: '#ffc9c9', elite: '#e599f7', boss: '#ff8787', chest: '#ffe066', trap: '#ffa94d', rest: '#96f2d7', gate: '#ced4da', island: '#99e9f2', start: '#fff' }[t.type] || '#fff';
-      return html`<g class=${'tile' + (isChoice ? ' choice' : '')} onClick=${() => isChoice && onChoose(t.id)}>
-        <circle cx=${t.x} cy=${t.y} r=${t.type === 'boss' ? 30 : 23} fill=${done ? '#e9ecef' : fill} stroke=${isChoice ? '#5b6cff' : '#3a2f3b'} stroke-width=${isChoice ? 6 : 2.5} />
-        <text x=${t.x} y=${t.y + 8} text-anchor="middle" font-size=${t.type === 'boss' ? 26 : 20}>${done ? '✔️' : t.type === 'boss' ? w.boss[0] : icon}</text>
-        ${t.type === 'gate' && html`<text x=${t.x} y=${t.y - 28} text-anchor="middle" font-size="15" font-weight="800" fill="#3a2f3b">🎲🎲 ${t.need}+</text>`}
+      const r = t.type === 'boss' ? 32 : 24;
+      return html`<g class=${'tile' + (isChoice ? ' choice' : '')} onClick=${() => (isChoice ? onChoose(t.id) : onInfo?.(t))}>
+        <title>${label}</title>
+        <circle cx=${t.x} cy=${t.y + 4} r=${r} fill="#000" opacity="0.18" />
+        <circle cx=${t.x} cy=${t.y} r=${r} fill=${done ? '#e9ecef' : TILE_FILL[t.type]} stroke=${isChoice ? '#5b6cff' : '#3a2f3b'} stroke-width=${isChoice ? 6 : 3} />
+        <circle cx=${t.x - r * 0.3} cy=${t.y - r * 0.35} r=${r * 0.28} fill="#fff" opacity="0.45" />
+        <text x=${t.x} y=${t.y + (t.type === 'boss' ? 10 : 7)} text-anchor="middle" font-size=${t.type === 'boss' ? 30 : 21}>${done ? '✔️' : t.type === 'boss' ? w.boss[0] : t.type === 'start' ? '🚩' : icon}</text>
+        ${t.type === 'gate' && html`<g><rect x=${t.x - 30} y=${t.y - 50} width="60" height="20" rx="10" fill="#fff" stroke="#3a2f3b" stroke-width="2" />
+          <text x=${t.x} y=${t.y - 35} text-anchor="middle" font-size="13" font-weight="800" fill="#3a2f3b">🎲🎲 ${t.need}+</text></g>`}
+        ${t.type === 'boss' && html`<text x=${t.x} y=${t.y + 52} text-anchor="middle" font-size="14" font-weight="800" fill="#3a2f3b">👑 ${w.boss[1]}</text>`}
       </g>`;
     })}
-    ${(() => { const t = TILE[tile]; return html`<g class="token" style=${`transform: translate(${t.x}px, ${t.y - 34}px)`}>
-      <circle r="24" fill="#fff" stroke="#5b6cff" stroke-width="4" /><image href=${avatarUri} x="-22" y="-22" width="44" height="44" />
-    </g>`; })()}
+    ${placed.map((p) => html`<${Token} x=${p.x} y=${p.y} r=${p.me ? 24 : 17} uri=${p.uri} me=${p.me}
+      name=${p.me ? myName : (p.display_name || '친구').slice(0, 4)} color=${p.me ? '#5b6cff' : '#f08c00'} />`)}
   </svg>`;
+}
+
+function MapLegend({ world }) {
+  const w = worldInfo(world);
+  return html`<div class="map-legend">${LEGEND.map((k) => {
+    const [icon, label] = TILE_INFO[k];
+    return html`<div class="lg-item">
+      <span class="lg-dot" style=${`background:${TILE_FILL[k]}`}>${k === 'boss' ? w.boss[0] : k === 'start' ? '🚩' : icon}</span>
+      <span><b>${label.replace(/ \(.*\)/, '')}</b><small>${LEGEND_DESC[k]}</small></span>
+    </div>`;
+  })}
+    <div class="lg-item"><span class="lg-dot me">나</span><span><b>나</b><small>파란 테두리</small></span></div>
+    <div class="lg-item"><span class="lg-dot friend">🧑</span><span><b>친구</b><small>주황 테두리</small></span></div>
+  </div>`;
 }
 
 // ---------- 전투 ----------
@@ -171,7 +274,8 @@ export function GamePage({ profile, refreshProfile }) {
   const chooseRef = useRef(null);
   const stats = totalStats(profile);
   const mhp = maxHp(stats);
-  const avatarUri = useMemo(() => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(avatarSvg(profile.avatar_cfg, 'portrait')), [JSON.stringify(profile.avatar_cfg)]);
+  const [friends, setFriends] = useState([]);
+  const avatarUri = useMemo(() => toUri(profile.avatar_cfg), [JSON.stringify(profile.avatar_cfg)]);
 
   const load = async () => {
     try {
@@ -181,6 +285,8 @@ export function GamePage({ profile, refreshProfile }) {
       ]);
       if (q.error) throw q.error;
       setSt(g);
+      // 친구 위치 (업데이트 7을 안 했으면 그냥 안 보여요)
+      rpc('game_others').then((fs) => setFriends((fs || []).map((f) => ({ ...f, uri: toUri(f.avatar_cfg) })))).catch(() => {});
       setPool(q.data.filter((x) => x.type !== 'mcq' || (x.data.choices || []).length >= 2));
     } catch (e) { setErr(friendlyError(e)); }
   };
@@ -328,8 +434,14 @@ export function GamePage({ profile, refreshProfile }) {
         ${st.stuck > 0 ? '🏝️ 탈출 굴리기' : tile.type === 'gate' ? `🎲🎲 길목 도전 (${tile.need}+)` : '🎲 주사위 굴리기'} <small>(남은 ${st.rolls_left}번)</small></button>
     </div>
     <div class="map-wrap">
-      <${GameMap} world=${st.world} tile=${st.tile} defeated=${st.defeated || []} choices=${choices} onChoose=${(id) => chooseRef.current?.(id)} avatarUri=${avatarUri} />
+      <${GameMap} world=${st.world} tile=${st.tile} defeated=${st.defeated || []} choices=${choices} onChoose=${(id) => chooseRef.current?.(id)}
+        onInfo=${(t) => !busy && setMsg(`${TILE_INFO[t.type][0] || '👣'} ${TILE_INFO[t.type][1]} — ${t.type === 'gate' ? `주사위 2개 합이 ${t.need} 이상이면 통과` : LEGEND_DESC[t.type]}`)}
+        avatarUri=${avatarUri} myName=${(profile.display_name || '나').slice(0, 4)} friends=${friends} />
     </div>
+    ${friends.length > 0 && html`<div class="card friend-strip"><b>👫 친구들은 어디까지 갔을까?</b>
+      <div class="friend-list">${[...friends].sort((a, b) => b.world - a.world || (ORDER[b.tile] ?? 0) - (ORDER[a.tile] ?? 0)).map((f) => html`<div class=${'friend-chip' + (f.world === st.world ? ' same' : '')}>
+        <img src=${f.uri} alt="" /><span><b>${f.display_name || '친구'}</b><small>${worldInfo(f.world).emoji} 월드 ${f.world} · ${Math.round(((ORDER[f.tile] ?? 0) / 28) * 100)}%</small></span></div>`)}</div></div>`}
+    <details class="card legend-card" open><summary><b>🗺️ 지도 표시 보기</b> <small class="muted">(칸을 누르면 설명이 나와요)</small></summary><${MapLegend} world=${st.world} /></details>
 
     ${st.rolls_left <= 0 && html`<div class="card row-card highlight"><span class="big-emoji">📚</span><div><b>오늘 주사위를 다 썼어요!</b><div class="muted">복습 퀴즈를 끝까지 풀면 주사위를 1번 더 받아요 (하루 최대 3번). 내일 다시 5번이 채워져요.</div></div></div>`}
 
