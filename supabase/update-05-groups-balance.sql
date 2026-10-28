@@ -78,6 +78,7 @@ language sql immutable as $$ select coalesce(sum(public.xp_need(l)), 0)::int fro
 
 -- 지금 레벨은 그대로 두고, 새 곡선에 맞게 경험치 막대만 맞추기 (한 번만)
 create table if not exists public.app_meta (key text primary key, done_at timestamptz not null default now());
+alter table public.app_meta enable row level security;
 do $$
 begin
   if not exists (select 1 from public.app_meta where key = 'update05_xp') then
