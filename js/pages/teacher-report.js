@@ -87,6 +87,7 @@ function StudentReport({ studentId }) {
       <div class="tile"><small>정답률</small><b class=${'acc-text ' + accClass(r.acc)}>${r.acc ?? '-'}<small>%</small></b></div>
       <div class="tile"><small>처음 풀 때 정답률</small><b>${r.firstAcc ?? '-'}<small>%</small></b></div>
       <div class="tile"><small>오답 극복</small><b>${r.comeback}<small>문항</small></b></div>
+      <div class="tile"><small>🌟 보너스 도전</small><b>${r.bonus ? r.bonus.right + '/' + r.bonus.n : '-'}<small>${r.bonus ? ' ' + r.bonus.target : ''}</small></b></div>
       <div class="tile"><small>서술형 성실도</small><b>${r.essayEffortAvg ?? '-'}<small>/3</small></b></div>
     </div>
 

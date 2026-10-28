@@ -1947,3 +1947,7 @@ alter function public.xp_need(int) set search_path = public;
 alter function public.xp_floor(int) set search_path = public;
 alter function public._scaled(int, numeric) set search_path = public;
 alter function public._game_json(public.game_state) set search_path = public;
+
+-- 업데이트 10: 난이도 5 심화 허용
+alter table public.questions drop constraint if exists questions_difficulty_check;
+alter table public.questions add constraint questions_difficulty_check check (difficulty between 1 and 5);

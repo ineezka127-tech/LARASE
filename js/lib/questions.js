@@ -18,13 +18,16 @@ export const FRAC_FORMS = {
   exact: '정답과 똑같은 모양이어야 정답',
 };
 
-export const DIFFICULTY = { 1: '쉬움', 2: '보통', 3: '어려움', 4: '도전' };
+export const DIFFICULTY = { 1: '쉬움', 2: '보통', 3: '어려움', 4: '도전', 5: '심화' };
 export const DIFFICULTY_DESC = {
   1: '자료에 나온 낱말·사실을 그대로 알아보거나 떠올리기',
   2: '뜻을 이해했는지 확인하기 (다른 말로 바꿔 묻기, 알맞은 예 고르기)',
   3: '배운 것을 새로운 예시·상황에 적용하기',
   4: '두 단계 이상 생각하기 (비교·이유·추론) — 그 그룹에서 가장 어려운 문제',
+  5: '가 그룹 도전보다 한 단계 더: 여러 개념을 함께 쓰거나 생활 속 문제를 해결하기 (가 그룹 보너스 도전용)',
 };
+// 🌟 보너스 도전: 내 그룹 도전 문제를 잘 풀면 윗단계 문제에 도전 (그룹은 바뀌지 않아요)
+export const BONUS_TARGET = { 다: '나', 나: '가', 가: '심화' };
 
 // 🎯 학생 그룹 (가=상, 나=중, 다=하). 그룹마다 쉬움~도전 난이도가 따로 있어요
 export const TIERS = ['가', '나', '다'];
@@ -93,7 +96,7 @@ export function normalizeQuestion(raw) {
   if (!TYPES[type]) throw new Error(`알 수 없는 문제 유형: ${raw.type}`);
   const prompt = String(raw.prompt || raw.question || '').trim();
   if (!prompt) throw new Error('문제 내용(prompt)이 비어 있어요');
-  const difficulty = [1, 2, 3, 4].includes(Number(raw.difficulty)) ? Number(raw.difficulty) : 2;
+  const difficulty = [1, 2, 3, 4, 5].includes(Number(raw.difficulty)) ? Number(raw.difficulty) : 2;
   const tier = TIERS.includes(String(raw.tier || raw.group || '').trim()) ? String(raw.tier || raw.group).trim() : null;
   const explanation = String(raw.explanation || '').trim();
   const str = (x) => String(x ?? '').trim();
@@ -203,7 +206,7 @@ export const PROMPT_LEVELS = {
   mix: ['골고루', [25, 35, 25, 15]],
   hard: ['도전 위주', [10, 25, 35, 30]],
 };
-export const DEFAULT_PROMPT_OPTS = { tiers: { 가: 8, 나: 8, 다: 6 }, level: 'mix', types: ['ox', 'mcq', 'short', 'match', 'order', 'essay'] };
+export const DEFAULT_PROMPT_OPTS = { tiers: { 가: 8, 나: 8, 다: 6 }, deep: 2, level: 'mix', types: ['ox', 'mcq', 'short', 'match', 'order', 'essay'] };
 
 const TYPE_HINT = {
   ox: 'O/X',
@@ -227,7 +230,7 @@ function split(n, entries) {
 
 export function promptTotal(opts) {
   const o = { ...DEFAULT_PROMPT_OPTS, ...opts };
-  return TIERS.reduce((s, t) => s + (Number(o.tiers?.[t]) || 0), 0);
+  return TIERS.reduce((s, t) => s + (Number(o.tiers?.[t]) || 0), 0) + (Number(o.tiers?.가) > 0 ? Number(o.deep) || 0 : 0);
 }
 
 function composition(opts) {
@@ -246,9 +249,10 @@ function composition(opts) {
     return `   [${info.name}] ${n}문제 — ${info.level}
      · 이렇게 내기: ${info.guide}
      · 유형: ${typeLine}
-     · 난이도: ${diffLine}`;
+     · 난이도: ${diffLine}${t === '가' && Number(o.deep) > 0 ? `
+     · 그리고 따로 심화(5) ${o.deep}개 더: ${DIFFICULTY_DESC[5]} (tier는 "가", difficulty는 5)` : ''}`;
   });
-  return `4. questions: 그룹별 퀴즈 모두 ${promptTotal(o)}문제. 모든 문제에 "tier"("가"/"나"/"다")와 "difficulty"(1~4)를 꼭 넣을 것
+  return `4. questions: 그룹별 퀴즈 모두 ${promptTotal(o)}문제. 모든 문제에 "tier"("가"/"나"/"다")와 "difficulty"(1~5)를 꼭 넣을 것
 ${blocks.join('\n')}
    - 같은 핵심 개념을 그룹마다 수준에 맞게 다르게 물어볼 것 (다 그룹: 알아보기 → 나 그룹: 이해 → 가 그룹: 적용·추론)
    - 한 그룹 안에서도 쉬움(1)에서 도전(4)으로 갈수록 생각하는 단계가 하나씩 늘어나게 만들 것
@@ -279,6 +283,7 @@ const PROMPT_RULES = `
   2 보통 = ${DIFFICULTY_DESC[2]}
   3 어려움 = ${DIFFICULTY_DESC[3]}
   4 도전 = ${DIFFICULTY_DESC[4]}
+  5 심화 = ${DIFFICULTY_DESC[5]}
 - mcq의 answer는 정답 보기의 번호(1~5)
 - short의 answers에는 정답으로 인정할 표현을 모두 넣을 것 (예: ["광합성", "광합성 작용"])
 - match의 pairs는 [왼쪽, 오른쪽] 순서, 오른쪽 낱말끼리 겹치지 않게

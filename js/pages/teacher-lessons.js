@@ -85,7 +85,7 @@ function QuestionEditor({ q, index, total, onChange, onMove, onDelete, error }) 
         <option value="">공통</option>${TIERS.map((t) => html`<option value=${t}>${t} 그룹</option>`)}
       </select>
       <select class="input" value=${q.difficulty} onChange=${(e) => set({ difficulty: Number(e.target.value) })}>
-        ${[1, 2, 3, 4].map((n) => html`<option value=${n}>${DIFFICULTY[n]}</option>`)}
+        ${[1, 2, 3, 4, 5].map((n) => html`<option value=${n}>${DIFFICULTY[n]}${n === 5 ? ' (가 보너스)' : ''}</option>`)}
       </select>
       <span class="spacer"></span>
       <button class="btn small ghost" disabled=${index === 0} onClick=${() => onMove(-1)}>▲</button>
@@ -162,7 +162,9 @@ function PromptOptions({ opts, setOpts }) {
     <div class="tier-counts">${TIERS.map((t) => html`<label class=${'tier-count t-' + t + (tiers[t] > 0 ? '' : ' off')} title=${TIER_INFO[t].level}>
       <span class="tier-badge">${t}</span><span><b>${TIER_INFO[t].name.slice(5)}</b><small>${TIER_INFO[t].level}</small></span>
       <select class="input" value=${tiers[t]} onChange=${(e) => setTier(t, Number(e.target.value))}>
-        ${[0, 4, 6, 8, 10, 12].map((n) => html`<option value=${n}>${n ? n + '문제' : '안 만듦'}</option>`)}</select></label>`)}
+        ${[0, 4, 6, 8, 10, 12].map((n) => html`<option value=${n}>${n ? n + '문제' : '안 만듦'}</option>`)}</select>
+      ${t === '가' && tiers.가 > 0 && html`<select class="input" title="가 그룹 보너스 도전용 심화 문제" value=${opts.deep ?? 2} onChange=${(e) => setOpts({ ...opts, deep: Number(e.target.value) })}>
+        ${[0, 2, 3, 4].map((n) => html`<option value=${n}>${n ? `+심화 ${n}` : '심화 없음'}</option>`)}</select>`}</label>`)}
       <span class="muted small">모두 ${promptTotal(opts)}문제</span></div>
     <label>그룹 안 난이도 곡선 <select class="input" value=${opts.level} onChange=${(e) => setOpts({ ...opts, level: e.target.value })}>
       ${Object.entries(PROMPT_LEVELS).map(([k, [label]]) => html`<option value=${k}>${label}</option>`)}</select></label>

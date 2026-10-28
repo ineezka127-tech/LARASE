@@ -12,7 +12,7 @@ const EVENT_TEXT = {
   view: '📖 복습 자료를 봤어요', quiz_done: '🏁 퀴즈를 끝까지 풀었어요', daily: '🔥 오늘 첫 접속', levelup: '⭐ 레벨 업!',
   buy: '🛍️ 상점에서 샀어요', essay_graded: '🌟 서술형 채점 받음', teacher_coins: '🎁 칭찬/약속', teacher_praise: '🎁 칭찬 받음', teacher_dice: '🎲 주사위 선물',
 };
-const MODE = { quiz: '퀴즈', set: '묶음 퀴즈', retry: '다시 풀기', game: '모험' };
+const MODE = { quiz: '퀴즈', set: '묶음 퀴즈', retry: '다시 풀기', game: '모험', bonus: '🌟 보너스 도전' };
 
 export function LiveDashboard() {
   const [students, setStudents] = useState(null);

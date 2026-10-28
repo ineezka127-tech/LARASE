@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useMemo, useRef } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
-import { checkAnswer, answerText, TYPES, DIFFICULTY, TIERS, tierOf } from '../lib/questions.js';
+import { checkAnswer, answerText, TYPES, DIFFICULTY, TIERS, tierOf, BONUS_TARGET } from '../lib/questions.js';
 import { speak, stopSpeaking, getAutoRead, setAutoRead, ttsSupported } from '../lib/tts.js';
 import { Loading, ErrorBox, SpeakBtn, reward, shuffle, toast } from '../components/ui.js';
 import { RichText, FractionInput } from '../components/math.js';
@@ -185,7 +185,7 @@ async function loadQuiz(source, profile, query) {
   let title;
   let backHref = '#/';
   if (source.lesson) {
-    const { data, error } = await sb.from('lessons').select('id,title').eq('id', source.lesson);
+    const { data, error } = await sb.from('lessons').select('id,title,subject').eq('id', source.lesson);
     if (error) throw error;
     if (!data.length) throw new Error('수업을 찾을 수 없어요.');
     lessons = data;
@@ -194,7 +194,7 @@ async function loadQuiz(source, profile, query) {
   } else if (source.topic) {
     const [t, l] = await Promise.all([
       sb.from('topics').select('*').eq('id', source.topic).maybeSingle(),
-      sb.from('lessons').select('id,title').eq('topic_id', source.topic),
+      sb.from('lessons').select('id,title,subject').eq('topic_id', source.topic),
     ]);
     if (t.error || l.error) throw t.error || l.error;
     if (!t.data) throw new Error('주제를 찾을 수 없어요.');
@@ -234,14 +234,40 @@ async function loadQuiz(source, profile, query) {
   if (query.wrong) list = shuffle(pool.filter((x) => last[x.id] === false)).map(prepare);
   else if (query.d || profile.role === 'teacher') list = drawQuestions(pool, last, n);   // 난이도를 직접 골랐거나 선생님 미리보기
   else {
-    const cands = forTier(pool, tierOf(profile), n);
+    const cands = forTier(pool.filter((q) => q.difficulty !== 5), tierOf(profile), n);   // 심화(5)는 보너스 도전에서만
     const level = startLevel(cands, last);
     const first = pickNext(cands, level, last, new Set());
     list = first ? [first] : [];
     adaptive = { cands, last, n: Math.min(n, cands.length), level };
   }
   const ref = source.lesson ? null : source.topic ? 'topic:' + source.topic : `range:${source.range?.from || ''}:${source.range?.to || ''}:${source.range?.s || ''}`;
-  return { title, backHref, list, ref, lessonId: source.lesson || null, adaptive };
+  const bonus = adaptive ? await loadBonus(pool, tierOf(profile), ids, [...new Set(lessons.map((l) => l.subject).filter(Boolean))]) : null;
+  return { title, backHref, list, ref, lessonId: source.lesson || null, adaptive, bonus };
+}
+
+// 🌟 보너스 도전 문제 고르기 (그룹은 그대로, 이번 퀴즈에서만 윗단계 문제 2개)
+// 다 → 나 그룹 문제, 나 → 가 그룹 문제, 가 → 심화(5) 문제. 심화 문제가 없으면 같은 과목 지난 수업의 가 그룹 도전 문제
+async function loadBonus(pool, tier, lessonIds, subjects) {
+  const target = BONUS_TARGET[tier];
+  const usable = (q) => q.type !== 'essay';
+  let list;
+  let label;
+  if (target !== '심화') {
+    list = pool.filter((q) => usable(q) && q.tier === target && q.difficulty >= 2 && q.difficulty <= 3);
+    if (list.length < 2) list = pool.filter((q) => usable(q) && q.tier === target && q.difficulty !== 5);
+    label = `${target} 그룹 문제`;
+  } else {
+    list = pool.filter((q) => usable(q) && q.difficulty === 5);
+    label = '심화 문제';
+    if (list.length < 2 && subjects.length) {
+      const { data } = await sb.from('questions').select('*, lessons!inner(subject)').eq('tier', '가').eq('difficulty', 4)
+        .in('lessons.subject', subjects).not('lesson_id', 'in', `(${lessonIds.join(',')})`).limit(40);
+      const more = (data || []).filter(usable);
+      if (more.length) { list = [...list, ...shuffle(more)]; label = list.length > more.length ? '심화 문제' : '지난 수업 도전 문제'; }
+    }
+  }
+  if (!list.length) return null;
+  return { target, label, list: shuffle(list).slice(0, 2).map((q) => ({ ...prepare(q), _bonus: true })) };
 }
 
 export function QuizPage({ source, profile, query }) {
@@ -257,6 +283,8 @@ export function QuizPage({ source, profile, query }) {
   const [auto, setAuto] = useState(getAutoRead());
   const [round, setRound] = useState(1);
   const [level, setLevel] = useState(1);
+  const [offer, setOffer] = useState(false);   // 🌟 보너스 도전 할까요?
+  const [extra, setExtra] = useState(0);       // 보너스 문제 수
 
   useEffect(() => {
     loadQuiz(source, profile, query).then((m) => { setMeta(m); setList(m.list); setLevel(m.adaptive?.level || 1); }).catch((e) => setErr(friendlyError(e)));
@@ -281,7 +309,7 @@ export function QuizPage({ source, profile, query }) {
     let xp = 0;
     try {
       const stored = q._map ? q._map[ans - 1] + 1 : ans;   // 섞인 보기 번호 → 원래 번호로 저장
-      const r = await rpc('submit_answer', { p_question: q.id, p_answer: stored, p_correct: correct === true, p_mode: round > 1 || query.wrong ? 'retry' : lessonId ? 'quiz' : 'set' });
+      const r = await rpc('submit_answer', { p_question: q.id, p_answer: stored, p_correct: correct === true, p_mode: q._bonus ? 'bonus' : round > 1 || query.wrong ? 'retry' : lessonId ? 'quiz' : 'set' });
       xp = r?.xp || 0;
       reward(r);
     } catch (e) {
@@ -294,7 +322,7 @@ export function QuizPage({ source, profile, query }) {
   };
 
   const adaptiveRound = meta?.adaptive && round === 1;
-  const total = adaptiveRound ? meta.adaptive.n : list.length;
+  const total = adaptiveRound ? meta.adaptive.n + extra : list.length;
   const next = async () => {
     stopSpeaking();
     if (idx + 1 < list.length) {
@@ -309,7 +337,22 @@ export function QuizPage({ source, profile, query }) {
         return;
       }
     }
-    const graded = results.filter((r) => r.correct !== null);
+    // 내 그룹 도전(4) 문제를 2개 이상 맞히면 보너스 도전을 권해요 (한 번만)
+    if (adaptiveRound && meta.bonus && !extra && !offer) {
+      const hard = results.filter((r) => !r.q._bonus && r.q.difficulty === 4 && r.correct === true).length;
+      if (hard >= 2) { setOffer(true); return; }
+    }
+    await finishQuiz();
+  };
+
+  const startBonus = () => {
+    setList([...list, ...meta.bonus.list]); setExtra(meta.bonus.list.length); setOffer(false);
+    setIdx(idx + 1); setAnswer(undefined); setResult(null);
+  };
+
+  const finishQuiz = async () => {
+    setOffer(false);
+    const graded = results.filter((r) => r.correct !== null && !r.q._bonus);
     const right = graded.filter((r) => r.correct).length;
     let bonus = null;
     if (round === 1 && !query.wrong) {
@@ -320,12 +363,14 @@ export function QuizPage({ source, profile, query }) {
         reward(bonus);
       } catch {}
     }
-    setFinish({ right, total: graded.length, essays: results.length - graded.length, bonus });
+    const bonusRes = results.filter((r) => r.q._bonus);
+    setFinish({ right, total: graded.length, essays: results.filter((r) => r.correct === null && !r.q._bonus).length, bonus,
+      challenge: bonusRes.length ? { right: bonusRes.filter((r) => r.correct).length, total: bonusRes.length, label: meta.bonus.label } : null });
   };
 
   // 🔁 같은 내용, 새로 뽑은 문제로 다시
   const restart = async () => {
-    setList(null); setFinish(null); setIdx(0); setAnswer(undefined); setResult(null); setResults([]); setRound(1);
+    setList(null); setFinish(null); setIdx(0); setAnswer(undefined); setResult(null); setResults([]); setRound(1); setExtra(0); setOffer(false);
     try { const m = await loadQuiz(source, profile, query); setMeta(m); setList(m.list); setLevel(m.adaptive?.level || 1); } catch (e) { setErr(friendlyError(e)); }
   };
 
@@ -333,6 +378,19 @@ export function QuizPage({ source, profile, query }) {
     const wrong = results.filter((r) => r.correct === false).map((r) => r.q);
     setList(wrong); setIdx(0); setAnswer(undefined); setResult(null); setResults([]); setFinish(null); setRound(round + 1);
   };
+
+  if (offer) {
+    return html`<div class="page narrow"><div class="card finish bonus-offer">
+      <div class="big-emoji" style="font-size:3.4em">🌟</div>
+      <h1>보너스 도전!</h1>
+      <p>도전 문제를 척척 맞혔어요! 👏<br/><b>${meta.bonus.label} ${meta.bonus.list.length}개</b>에 도전해 볼래요?</p>
+      <p class="muted small">틀려도 괜찮아요. 점수와 내 그룹은 그대로예요.</p>
+      <div class="btn-col">
+        <button class="btn huge primary block" onClick=${startBonus}>🌟 도전할래요!</button>
+        <button class="btn big block" onClick=${finishQuiz}>괜찮아요, 결과 볼래요</button>
+      </div>
+    </div></div>`;
+  }
 
   if (finish) {
     const pct = finish.total ? finish.right / finish.total : 1;
@@ -344,6 +402,8 @@ export function QuizPage({ source, profile, query }) {
         <h1>${pct === 1 ? '완벽해요! 🎉' : pct >= 0.6 ? '잘했어요! 👏' : '끝까지 해냈어요! 💪'}</h1>
         <p class="finish-score">${finish.total > 0 && html`<b>${finish.right}</b> / ${finish.total} 맞힘`}
           ${finish.essays > 0 && html`<br/><small>서술형 ${finish.essays}개는 선생님이 확인해요 📮</small>`}</p>
+        ${finish.challenge && html`<p class=${'challenge-result' + (finish.challenge.right === finish.challenge.total ? ' perfect' : '')}>🌟 보너스 도전 (${finish.challenge.label}) <b>${finish.challenge.right} / ${finish.challenge.total}</b>
+          ${finish.challenge.right === finish.challenge.total ? ' 대단해요! 🏅' : finish.challenge.right > 0 ? ' 잘했어요!' : ' 멋진 도전이었어요!'}</p>`}
         ${finish.bonus?.xp > 0 && html`<p class="pill xp">🏁 완주 보너스 +${finish.bonus.xp} XP${finish.bonus.perfect ? ' (만점 2배!)' : ''}</p>`}
         <p class="muted">${gained}문제를 풀었어요.</p>
         <div class="btn-col">
@@ -369,7 +429,7 @@ export function QuizPage({ source, profile, query }) {
       return html`<span class=${cls}></span>`;
     })}</div>
     <div class="card question" key=${q.id + round}>
-      <div class="q-meta"><span class="pill">${TYPES[q.type].icon} ${TYPES[q.type].label}</span><span class=${'pill d' + q.difficulty}>${DIFFICULTY[q.difficulty]}</span><span class="muted">${idx + 1} / ${total}</span></div>
+      <div class="q-meta">${q._bonus && html`<span class="pill bonus">🌟 보너스 도전</span>`}<span class="pill">${TYPES[q.type].icon} ${TYPES[q.type].label}</span><span class=${'pill d' + q.difficulty}>${DIFFICULTY[q.difficulty]}</span><span class="muted">${idx + 1} / ${total}</span></div>
       <div class="q-prompt"><${RichText} text=${q.prompt} /> <${SpeakBtn} text=${q.prompt} /></div>
       <${View} q=${q} done=${done} answer=${answer} onAnswer=${submit} />
     </div>

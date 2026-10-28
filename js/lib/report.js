@@ -8,7 +8,7 @@ export const todayKst = () => kstDate(Date.now());
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : null);
 const pctText = (a, b) => (b ? `${pct(a, b)}%` : '-');
 export const EFFORT_LABEL = { 1: '조금', 2: '보통', 3: '성실' };
-const MODE_LABEL = { quiz: '수업 퀴즈', set: '묶음 퀴즈', retry: '다시 풀기', game: '모험 지도 전투' };
+const MODE_LABEL = { quiz: '수업 퀴즈', set: '묶음 퀴즈', retry: '다시 풀기', game: '모험 지도 전투', bonus: '🌟 보너스 도전 (윗단계)' };
 
 // Supabase는 한 번에 1000줄까지라서 나눠서 가져와요
 export async function fetchAll(build, size = 1000) {
@@ -68,7 +68,7 @@ export function computeReport({ student, attempts, events, topics, from, to }) {
   const byTopic = group(auto, (a) => `${a.lessons?.subject || '기타'}|${topics[a.lessons?.topic_id] || '(주제 없음)'}`)
     .map((g) => ({ ...g, subject: g.key.split('|')[0], topic: g.key.split('|')[1] })).sort((x, y) => x.subject.localeCompare(y.subject) || y.n - x.n);
   const byLesson = group(auto, (a) => a.lessons?.title || '(수업 없음)').sort((x, y) => y.n - x.n);
-  const byDifficulty = [1, 2, 3, 4].map((d) => { const g = group(auto.filter((a) => a.questions?.difficulty === d), () => d)[0]; return { key: d, n: g?.n || 0, right: g?.right || 0, pct: g?.pct ?? null }; });
+  const byDifficulty = [1, 2, 3, 4, 5].map((d) => { const g = group(auto.filter((a) => a.questions?.difficulty === d), () => d)[0]; return { key: d, n: g?.n || 0, right: g?.right || 0, pct: g?.pct ?? null }; });
   const byType = group(auto, (a) => a.questions?.type).sort((x, y) => y.n - x.n);
   const byMode = group(auto, (a) => a.mode || 'quiz');
   const byTier = group(auto, (a) => a.questions?.tier || '공통');
@@ -97,6 +97,11 @@ export function computeReport({ student, attempts, events, topics, from, to }) {
   const firstTry = [...hist.values()].map((h) => h[0]);
   const firstRight = firstTry.filter((a) => a.is_correct).length;
 
+  // 🌟 보너스 도전 (윗그룹·심화 문제) — 그룹을 올릴지 생각할 때 참고
+  const bonusAtt = auto.filter((a) => a.mode === 'bonus');
+  const bonus = bonusAtt.length ? { n: bonusAtt.length, right: bonusAtt.filter((a) => a.is_correct).length, pct: pct(bonusAtt.filter((a) => a.is_correct).length, bonusAtt.length),
+    target: { 다: '나 그룹', 나: '가 그룹', 가: '심화' }[tierOf(student)] } : null;
+
   const graded = essays.filter((a) => a.graded_at);
   const efforts = essays.filter((a) => a.effort);
   const avg = (xs) => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 10) / 10 : null);
@@ -110,7 +115,7 @@ export function computeReport({ student, attempts, events, topics, from, to }) {
     xp: events.reduce((s, e) => s + (e.xp || 0), 0),
     total: auto.length, right, acc: pct(right, auto.length),
     uniqueQuestions: hist.size, firstRight, firstAcc: pct(firstRight, firstTry.length),
-    comeback,
+    comeback, bonus,
     bySubject, byTopic, byLesson, byDifficulty, byType, byMode, byTier, byWeek, trend,
     missed: missed.slice(0, 10),
     essays: essays.map((a) => ({ date: kstDate(a.created_at), lesson: a.lessons?.title, prompt: a.questions?.prompt, model: a.questions?.data?.model_answer, keywords: a.questions?.data?.keywords || [], answer: String(a.answer ?? ''), score: a.score, effort: a.effort, feedback: a.feedback, graded: !!a.graded_at })),
@@ -147,6 +152,11 @@ function levelSentences(r) {
     if (r.trend.second - r.trend.first >= 10) out.push(`기간 후반 정답률이 ${r.trend.first}% → ${r.trend.second}%로 향상됨.`);
     else if (r.trend.first - r.trend.second >= 10) out.push(`기간 후반 정답률이 ${r.trend.first}% → ${r.trend.second}%로 낮아져, 최근 학습 내용에 대한 확인이 필요함.`);
   }
+  if (r.bonus) {
+    const b = r.bonus;
+    if (b.n >= 3 && b.pct >= 80) out.push(`보너스 도전에서 ${b.target} 수준 문제를 ${b.n}문항 중 ${b.right}문항 해결함(${b.pct}%). ${r.tier === '가' ? '심화 과제를 제공할 수 있음.' : '상위 그룹 학습을 검토할 수 있음.'}`);
+    else out.push(`보너스 도전에서 ${b.target} 수준 문제에 ${b.n}번 도전하여 ${b.right}문항 해결함(${b.pct}%).`);
+  }
   if (r.comeback > 0) out.push(`틀린 문제를 다시 풀어 ${r.comeback}문항을 스스로 해결함(오답 극복).`);
   if (r.essays.length) {
     const eff = r.essayEffortAvg;
@@ -181,6 +191,7 @@ export function reportMarkdown(r) {
     ['정답률 (전체 풀이)', r.acc != null ? `${r.acc}%` : '-'],
     ['처음 풀었을 때 정답률', r.firstAcc != null ? `${r.firstAcc}%` : '-'],
     ['오답 극복', `${r.comeback}문항 (틀렸다가 다시 맞힘)`],
+    ['🌟 보너스 도전', r.bonus ? `${r.bonus.target} 수준 ${r.bonus.n}문항 중 ${r.bonus.right}문항 성공 (${r.bonus.pct}%) — 그룹은 그대로` : '없음'],
     ['서술형', r.essays.length ? `${r.essays.length}개 · 평균 점수 ${r.essayScoreAvg ?? '-'}/2 · 성실도 ${r.essayEffortAvg ?? '-'}/3 · 평균 ${r.essayLenAvg ?? '-'}자` : '없음'],
     ['복습 자료 보기 / 퀴즈 완주', `${r.views}회 / ${r.quizzesDone}회`],
     ['얻은 경험치', `${r.xp} XP`],
@@ -197,7 +208,7 @@ export function reportMarkdown(r) {
   L.push(table(['수업', '푼 문제', '정답률'], r.byLesson.map((t) => [t.key, t.n, pctText(t.right, t.n)])));
   L.push('## 4. 난이도별 (그룹 안 난이도)');
   L.push('');
-  L.push(table(['난이도', '뜻', '푼 문제', '정답률'], r.byDifficulty.map((d) => [DIFFICULTY[d.key], ['', '알아보기·떠올리기', '이해하기', '적용하기', '추론·비교하기'][d.key], d.n, pctText(d.right, d.n)])));
+  L.push(table(['난이도', '뜻', '푼 문제', '정답률'], r.byDifficulty.filter((d) => d.key < 5 || d.n).map((d) => [DIFFICULTY[d.key], ['', '알아보기·떠올리기', '이해하기', '적용하기', '추론·비교하기', '심화 (여러 개념·생활 문제)'][d.key], d.n, pctText(d.right, d.n)])));
   L.push('## 5. 문제 유형별');
   L.push('');
   L.push(table(['유형', '푼 문제', '정답률'], r.byType.map((t) => [TYPES[t.key]?.label || t.key, t.n, pctText(t.right, t.n)])));

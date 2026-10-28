@@ -74,7 +74,7 @@ export function LessonView({ lessonId, profile }) {
     ['cards', '🃏 낱말 카드'],
     ['pages', '🖼️ 판서'],
   ];
-  const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   const myTier = tierOf(profile);
   const mineQs = qs.filter((q) => profile?.role === 'teacher' || !q.tier || q.tier === myTier);
   (mineQs.length ? mineQs : qs).forEach((q) => { counts[q.difficulty] = (counts[q.difficulty] || 0) + 1; });
@@ -109,8 +109,8 @@ export function LessonView({ lessonId, profile }) {
       ${profile?.role !== 'teacher' && mineQs.length < qs.length && html`<p class="muted small">${myTier} 그룹 문제 ${mineQs.length}개${mineQs.some((q) => !q.tier) ? ' (공통 문제 포함)' : ''} 중에서 나와요</p>`}
       <div class="pick-list">
         <a class="btn big primary block" href=${'#/quiz/' + lessonId}>🎯 나에게 맞춰 풀기 <small>(맞히면 점점 어려워져요)</small></a>
-        ${[1, 2, 3, 4].filter((d) => counts[d]).map((d) => html`<a class="btn big block" href=${`#/quiz/${lessonId}?d=${d}`}>
-          ${['', '🌱', '🌿', '🌳', '🏔️'][d]} ${DIFFICULTY[d]} 문제 (${counts[d]})</a>`)}
+        ${[1, 2, 3, 4, 5].filter((d) => counts[d]).map((d) => html`<a class="btn big block" href=${`#/quiz/${lessonId}?d=${d}`}>
+          ${['', '🌱', '🌿', '🌳', '🏔️', '🌟'][d]} ${DIFFICULTY[d]} 문제 (${counts[d]})</a>`)}
       </div>
       <button class="btn ghost block" onClick=${() => setPick(false)}>닫기</button>
     <//>`}
