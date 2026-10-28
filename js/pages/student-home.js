@@ -2,11 +2,13 @@ import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
 import { Loading, ErrorBox, XPBar, fmtDate } from '../components/ui.js';
 import { AvatarImg } from '../components/avatar-ui.js';
+import { GroupedLessons } from '../components/grouped.js';
+import { loadCatalog } from '../lib/groups.js';
 
 // 학생 화면에서 함께 쓰는 진도 정보 불러오기
 export async function loadProgress(userId) {
   const [lessons, questions, attempts, views] = await Promise.all([
-    sb.from('lessons').select('id,title,subject,unit,lesson_date,created_at').order('lesson_date', { ascending: false }).order('created_at', { ascending: false }),
+    sb.from('lessons').select('id,title,subject,unit,topic_id,lesson_date,created_at').order('lesson_date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('questions').select('id,lesson_id,type'),
     sb.from('attempts').select('id,question_id,lesson_id,is_correct,score,feedback,graded_at,created_at').eq('user_id', userId).order('created_at', { ascending: false }),
     sb.from('events').select('ref,created_at').eq('user_id', userId).eq('kind', 'view'),
@@ -25,13 +27,13 @@ export async function loadProgress(userId) {
     if (a.is_correct === false) p.wrong.add(a.question_id);
     else p.done.add(a.question_id);
   }
-  return { lessons: lessons.data, byLesson, viewed, attempts: attempts.data };
+  const catalog = await loadCatalog();
+  return { lessons: lessons.data, byLesson, viewed, attempts: attempts.data, ...catalog };
 }
 
 export function StudentHome({ profile }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
-  const [subject, setSubject] = useState('');
 
   const load = () => loadProgress(profile.id).then(setData).catch((e) => setErr(friendlyError(e)));
   useEffect(() => { load(); }, []);
@@ -40,11 +42,18 @@ export function StudentHome({ profile }) {
   if (!data) return html`<${Loading} />`;
 
   const { lessons, byLesson, viewed, attempts } = data;
-  const subjects = [...new Set(lessons.map((l) => l.subject).filter(Boolean))];
-  const shown = subject ? lessons.filter((l) => l.subject === subject) : lessons;
   const fresh = lessons.filter((l) => !viewed.has(l.id)).slice(0, 3);
   const weekAgo = Date.now() - 7 * 86400000;
   const replies = attempts.filter((a) => a.graded_at && new Date(a.graded_at).getTime() > weekAgo);
+  const groupActions = ({ kind, topic, range, subject: subj, period }) => {
+    if (kind === 'topic') return html`<a class="btn small primary" href=${'#/quiz/topic/' + topic.id}>🎯 주제 전체 퀴즈</a>`;
+    if (kind === 'range') {
+      const q = new URLSearchParams({ ...(range[0] ? { from: range[0], to: range[1] } : {}), ...(subj ? { s: subj } : {}) });
+      return html`<a class="btn small primary" href=${'#/quiz/range?' + q}>${period ? '🧠 이 기간 총정리 퀴즈' : '🧠 이 주 총정리 퀴즈'}</a>`;
+    }
+    if (kind === 'subject') return html`<a class="btn small" href=${'#/quiz/range?' + new URLSearchParams({ s: subj, ...(range[0] ? { from: range[0], to: range[1] } : {}) })}>🧠 과목 총정리 퀴즈</a>`;
+    return null;
+  };
   const wrongTotal = Object.values(byLesson).reduce((s, p) => s + p.wrong.size, 0);
 
   return html`<div class="page">
@@ -90,26 +99,24 @@ export function StudentHome({ profile }) {
 
     <section>
       <h2>📚 내 수업</h2>
-      ${subjects.length > 1 && html`<div class="chips">
-        <button class=${'chip' + (!subject ? ' on' : '')} onClick=${() => setSubject('')}>전체</button>
-        ${subjects.map((s) => html`<button class=${'chip' + (subject === s ? ' on' : '')} onClick=${() => setSubject(s)}>${s}</button>`)}
-      </div>`}
-      ${shown.length === 0 && html`<div class="card empty">아직 올라온 수업이 없어요. 😊</div>`}
-      <div class="grid">${shown.map((l) => {
-        const p = byLesson[l.id];
-        const pct = p.total ? Math.round((p.done.size / p.total) * 100) : 0;
-        return html`<div class="card lesson-card">
-          <div class="lesson-meta">${l.subject}${l.unit && ' · ' + l.unit} · ${fmtDate(l.lesson_date)}</div>
-          <h3>${l.title} ${pct === 100 && '🏅'}</h3>
-          <div class="progress"><div style=${`width:${pct}%`}></div></div>
-          <div class="muted small">${p.done.size} / ${p.total} 문제 완료${p.wrong.size ? ` · 다시 풀 문제 ${p.wrong.size}개` : ''}</div>
-          <div class="btn-row">
-            <a class="btn" href=${'#/lesson/' + l.id}>📖 복습</a>
-            <a class="btn primary" href=${'#/quiz/' + l.id}>🎯 퀴즈</a>
-            ${p.wrong.size > 0 && html`<a class="btn warn" href=${'#/quiz/' + l.id + '?wrong=1'}>💪 오답</a>`}
-          </div>
-        </div>`;
-      })}</div>
+      ${lessons.length === 0 && html`<div class="card empty">아직 올라온 수업이 없어요. 😊</div>`}
+      ${lessons.length > 0 && html`<${GroupedLessons} lessons=${lessons} subjects=${data.subjects} topics=${data.topics} storageKey="student-groups"
+        groupActions=${groupActions} renderLesson=${(l) => {
+          const p = byLesson[l.id];
+          const pct = p.total ? Math.round((p.done.size / p.total) * 100) : 0;
+          const topic = data.topics.find((t) => t.id === l.topic_id);
+          return html`<div class="card lesson-card" key=${l.id}>
+            <div class="lesson-meta">${l.subject}${topic && ' · ' + topic.name} · ${fmtDate(l.lesson_date)}</div>
+            <h3>${l.title} ${pct === 100 && '🏅'}</h3>
+            <div class="progress"><div style=${`width:${pct}%`}></div></div>
+            <div class="muted small">${p.done.size} / ${p.total} 문제 완료${p.wrong.size ? ` · 다시 풀 문제 ${p.wrong.size}개` : ''}</div>
+            <div class="btn-row">
+              <a class="btn" href=${'#/lesson/' + l.id}>📖 복습</a>
+              <a class="btn primary" href=${'#/quiz/' + l.id}>🎯 퀴즈</a>
+              ${p.wrong.size > 0 && html`<a class="btn warn" href=${'#/quiz/' + l.id + '?wrong=1'}>💪 오답</a>`}
+            </div>
+          </div>`;
+        }} />`}
     </section>
   </div>`;
 }

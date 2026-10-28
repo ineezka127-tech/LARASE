@@ -89,6 +89,6 @@ export function StatPanel({ profile, cfg, onChange, editable = true }) {
       <small class="muted">${gear[k] ? `장비 +${gear[k]}` : ''}${inv[k] ? ` · 투자 ${inv[k]}` : ''}</small>
       ${editable && profile.stat_points > 0 && html`<button class="btn small primary stat-up" disabled=${busy} onClick=${() => up(k)}>+</button>`}
     </div>`)}
-    ${editable && html`<div class="muted small">${profile.stat_points > 0 ? `🎯 스탯 포인트 ${profile.stat_points}개를 쓸 수 있어요! (+ 누르기)` : '레벨이 오르면 스탯 포인트 3개를 받아요.'}</div>`}
+    ${editable && html`<div class="muted small">${profile.stat_points > 0 ? `🎯 스탯 포인트 ${profile.stat_points}개를 쓸 수 있어요! (+ 누르기)` : '레벨이 오를 때마다 스탯 포인트 1개를 받아요.'}</div>`}
   </div>`;
 }

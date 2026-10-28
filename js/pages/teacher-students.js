@@ -1,5 +1,5 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
-import { sb, createAccount, friendlyError, normalizeLoginId } from '../lib/sb.js';
+import { sb, rpc, createAccount, friendlyError, normalizeLoginId } from '../lib/sb.js';
 import { Loading, ErrorBox, toast } from '../components/ui.js';
 import { AvatarImg } from '../components/avatar-ui.js';
 
@@ -41,6 +41,16 @@ export function StudentsPage() {
     const { error } = await sb.from('profiles').update({ grade: grade || null }).eq('id', s.id);
     if (error) toast('⚠️ ' + friendlyError(error)); else { toast('저장했어요 ✔'); load(); }
   };
+  const reset = async (s) => {
+    const who = s ? `${s.display_name || s.login_id}` : '학생 전체';
+    if (!confirm(`${who}의 경험치·레벨·스탯을 처음(레벨 1)으로 되돌릴까요?\n풀이 기록과 산 아이템은 그대로 남아요.`)) return;
+    const keep = confirm('코인도 그대로 둘까요?\n[확인] 코인 유지  /  [취소] 코인을 50으로 되돌리기');
+    try {
+      const r = await rpc('reset_progress', { p_user: s ? s.id : null, p_keep_coins: keep });
+      toast(`🔄 ${r.reset}명을 초기화했어요`);
+      load();
+    } catch (e) { toast('⚠️ ' + friendlyError(e)); }
+  };
   const clearName = async (s) => {
     if (!confirm(`${s.login_id}의 이름을 지울까요? 다음 로그인 때 이름을 새로 정하게 돼요.`)) return;
     const { error } = await sb.from('profiles').update({ display_name: null }).eq('id', s.id);
@@ -60,10 +70,12 @@ export function StudentsPage() {
           <td><select class="input" value=${s.grade || ''} onChange=${(e) => setGrade(s, Number(e.target.value))}>
             <option value="">-</option>${[1, 2, 3].map((g) => html`<option value=${g}>${g}학년</option>`)}</select></td>
           <td>Lv.${s.level}</td><td>${s.xp}</td><td>🪙 ${s.coins ?? 0}</td>
-          <td class="right"><a class="btn small" href=${'#/t/student/' + s.id}>기록·🎁코인</a> <button class="btn small ghost" onClick=${() => clearName(s)}>이름 초기화</button></td>
+          <td class="right"><a class="btn small" href=${'#/t/student/' + s.id}>기록·🎁코인</a> <button class="btn small ghost" onClick=${() => clearName(s)}>이름 초기화</button> <button class="btn small ghost" onClick=${() => reset(s)}>🔄 진도 초기화</button></td>
         </tr>`)}
       </table>
       ${list.length === 0 && html`<p class="muted">아직 학생 계정이 없어요. 아래에서 만들어 주세요.</p>`}
+      ${list.length > 0 && html`<div class="btn-row"><button class="btn small warn" onClick=${() => reset(null)}>🔄 학생 전체 진도 초기화</button>
+        <span class="muted small">실제 수업을 시작하기 전에 테스트로 쌓인 경험치·레벨을 지울 때 쓰세요. 풀이 기록은 남아요.</span></div>`}
     </div>
 
     <div class="card">

@@ -1,6 +1,8 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
-import { TYPES, DIFFICULTY, FRAC_FORMS, emptyQuestion, parseAIResult, validateQuestion, AI_PROMPT } from '../lib/questions.js';
+import { TYPES, DIFFICULTY, FRAC_FORMS, emptyQuestion, parseAIResult, validateQuestion, buildPrompt, buildVariantPrompt, flashcardQuestions, PROMPT_TYPES, PROMPT_LEVELS, DEFAULT_PROMPT_OPTS } from '../lib/questions.js';
+import { loadCatalog, remember, store } from '../lib/groups.js';
+import { GroupedLessons } from '../components/grouped.js';
 import { fracToken } from '../lib/fraction.js';
 import { RichText } from '../components/math.js';
 import { imageToJpeg, pdfPageCount, pdfToJpegs, uploadJpeg, removeFiles, signedUrls, parsePageRange } from '../lib/files.js';
@@ -11,10 +13,12 @@ const GRADES = [1, 2, 3];
 // ---------- 수업 목록 ----------
 export function LessonList() {
   const [list, setList] = useState(null);
+  const [cat, setCat] = useState(null);
   const [err, setErr] = useState(null);
+  useEffect(() => { loadCatalog().then(setCat).catch((e) => setErr(friendlyError(e))); }, []);
 
   const load = async () => {
-    const { data, error } = await sb.from('lessons').select('id,title,subject,unit,lesson_date,published,grades,pages,questions(count)')
+    const { data, error } = await sb.from('lessons').select('id,title,subject,unit,topic_id,lesson_date,published,grades,pages,questions(count)')
       .order('lesson_date', { ascending: false }).order('created_at', { ascending: false });
     if (error) setErr(friendlyError(error)); else setList(data);
   };
@@ -32,25 +36,27 @@ export function LessonList() {
   };
 
   if (err) return html`<div class="page"><${ErrorBox} error=${err} onRetry=${load} /></div>`;
-  if (!list) return html`<${Loading} />`;
+  if (!list || !cat) return html`<${Loading} />`;
 
   return html`<div class="page">
-    <div class="page-head"><h1>📚 수업 자료</h1><a class="btn primary" href="#/t/lesson/new">➕ 새 수업 자료</a></div>
+    <div class="page-head"><h1>📚 수업 자료</h1><div class="btn-row"><a class="btn" href="#/t/subjects">📚 과목·주제 관리</a><a class="btn primary" href="#/t/lesson/new">➕ 새 수업 자료</a></div></div>
     ${list.length === 0 && html`<div class="card empty">아직 만든 수업이 없어요. 오른쪽 위 <b>새 수업 자료</b>를 눌러 시작하세요.</div>`}
-    <div class="list">${list.map((l) => html`<div class="card lesson-row">
-      <div class="lr-main">
-        <div class="lesson-meta">${fmtDate(l.lesson_date)} · ${l.subject || '과목 없음'}${l.unit && ' · ' + l.unit}</div>
+    ${list.length > 0 && html`<${GroupedLessons} lessons=${list} subjects=${cat.subjects} topics=${cat.topics} storageKey="teacher-groups"
+      groupActions=${({ kind, topic, range, subject }) => kind === 'topic'
+        ? html`<a class="btn small" href=${'#/quiz/topic/' + topic.id}>👀 주제 퀴즈 미리보기</a>`
+        : kind === 'range' ? html`<a class="btn small" href=${'#/quiz/range?' + new URLSearchParams({ ...(range[0] ? { from: range[0], to: range[1] } : {}), ...(subject ? { s: subject } : {}) })}>👀 총정리 퀴즈 미리보기</a>` : null}
+      renderLesson=${(l) => html`<div class="card lesson-tcard" key=${l.id}>
+        <div class="lesson-meta">${fmtDate(l.lesson_date)} · ${l.subject || '과목 없음'}${cat.topics.find((t) => t.id === l.topic_id) ? ' · ' + cat.topics.find((t) => t.id === l.topic_id).name : ''}</div>
         <b class="lr-title">${l.title}</b>
         <div class="muted small">문제 ${l.questions?.[0]?.count ?? 0}개 · 판서 ${l.pages.length}장 · ${l.grades.length ? l.grades.map((g) => g + '학년').join(', ') : '전체 학년'}</div>
-      </div>
-      <div class="btn-row">
-        <button class=${'btn small ' + (l.published ? 'good' : '')} onClick=${() => togglePublish(l)}>${l.published ? '✅ 공개 중' : '🙈 숨김'}</button>
-        <a class="btn small" href=${'#/t/lesson/' + l.id}>✏️ 편집</a>
-        <a class="btn small" href=${'#/class/' + l.id}>📺 수업 모드</a>
-        <a class="btn small" href=${'#/lesson/' + l.id}>👀 미리보기</a>
-        <button class="btn small ghost" onClick=${() => remove(l)}>🗑️</button>
-      </div>
-    </div>`)}</div>
+        <div class="btn-row">
+          <button class=${'btn small ' + (l.published ? 'good' : '')} onClick=${() => togglePublish(l)}>${l.published ? '✅ 공개 중' : '🙈 숨김'}</button>
+          <a class="btn small" href=${'#/t/lesson/' + l.id}>✏️ 편집</a>
+          <a class="btn small" href=${'#/class/' + l.id}>📺</a>
+          <a class="btn small" href=${'#/lesson/' + l.id}>👀</a>
+          <button class="btn small ghost" onClick=${() => remove(l)}>🗑️</button>
+        </div>
+      </div>`} />`}
   </div>`;
 }
 
@@ -70,6 +76,8 @@ function QuestionEditor({ q, index, total, onChange, onMove, onDelete, error }) 
   return html`<div class=${'card q-edit' + (error ? ' has-error' : '')}>
     <div class="q-edit-head">
       <b>${index + 1}.</b>
+      ${(q.set_no || 1) > 1 && html`<span class="pill">세트 ${q.set_no}</span>`}
+      ${q.source === 'auto' && html`<span class="pill good">🃏 자동</span>`}
       <select class="input" value=${q.type} onChange=${(e) => changeType(e.target.value)}>
         ${Object.entries(TYPES).map(([k, t]) => html`<option value=${k}>${t.icon} ${t.label}</option>`)}
       </select>
@@ -139,17 +147,32 @@ function cleanQuestion(q, position, lessonId) {
     data.choices = kept;
     data.answer = ans;
   }
-  return { id: q.id, lesson_id: lessonId, position, type: q.type, difficulty: q.difficulty, prompt: q.prompt.trim(), data };
+  return { id: q.id, lesson_id: lessonId, position, type: q.type, difficulty: q.difficulty, prompt: q.prompt.trim(), data, set_no: q.set_no || 1, source: q.source || 'manual' };
 }
 
 // ---------- AI 결과 가져오기 ----------
-function AIImport({ onImport }) {
+function PromptOptions({ opts, setOpts }) {
+  const toggle = (t) => setOpts({ ...opts, types: opts.types.includes(t) ? opts.types.filter((x) => x !== t) : [...opts.types, t] });
+  return html`<div class="prompt-opts">
+    <label>문항 수 <select class="input" value=${opts.count} onChange=${(e) => setOpts({ ...opts, count: Number(e.target.value) })}>
+      ${[6, 8, 10, 12, 15, 20].map((n) => html`<option value=${n}>${n}문제</option>`)}</select></label>
+    <label>난이도 <select class="input" value=${opts.level} onChange=${(e) => setOpts({ ...opts, level: e.target.value })}>
+      ${Object.entries(PROMPT_LEVELS).map(([k, [label]]) => html`<option value=${k}>${label}</option>`)}</select></label>
+    <div class="opt-types">문제 유형: ${Object.entries(PROMPT_TYPES).map(([k, label]) => html`<label class="check"><input type="checkbox" checked=${opts.types.includes(k)} onChange=${() => toggle(k)} /> ${label}</label>`)}</div>
+  </div>`;
+}
+
+function AIImport({ onImport, lesson, questions }) {
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
+  const [kind, setKind] = useState('new');   // new: 처음 만들기 / variant: 다른 문제 세트
   const [mode, setMode] = useState('replace');
+  const [opts, setOptsS] = useState(remember('prompt-opts', DEFAULT_PROMPT_OPTS));
+  const setOpts = (o) => { setOptsS(o); store('prompt-opts', o); };
+  const prompt = kind === 'variant' ? buildVariantPrompt(lesson, questions, opts) : buildPrompt(opts);
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(AI_PROMPT); toast('지시문을 복사했어요 ✔'); }
+    try { await navigator.clipboard.writeText(prompt); toast('지시문을 복사했어요 ✔'); }
     catch { setErr('복사가 안 되면 아래 "지시문 보기"를 눌러 직접 복사해 주세요.'); }
   };
   const doImport = () => {
@@ -157,7 +180,7 @@ function AIImport({ onImport }) {
     try {
       const r = parseAIResult(text);
       if (!r.questions.length && !r.lesson.summary) throw new Error('가져올 내용이 없어요.');
-      onImport(r, mode);
+      onImport(r, kind === 'variant' ? 'newset' : mode);
       setText('');
       toast(`문제 ${r.questions.length}개를 가져왔어요 ✔`);
       if (r.errors.length) setErr('일부 문제는 빠졌어요:\n' + r.errors.join('\n'));
@@ -166,17 +189,23 @@ function AIImport({ onImport }) {
 
   return html`<div class="card ai-box">
     <h2>🤖 클로드로 복습 자료·퀴즈 만들기</h2>
+    <div class="tabs">
+      <button class=${'tab' + (kind === 'new' ? ' on' : '')} onClick=${() => setKind('new')}>✨ 처음 만들기</button>
+      <button class=${'tab' + (kind === 'variant' ? ' on' : '')} disabled=${!questions.length} onClick=${() => setKind('variant')}>🔁 같은 내용, 다른 문제 세트</button>
+    </div>
+    ${kind === 'variant' && html`<p class="muted small">지금 있는 문제와 겹치지 않는 <b>새 문제 세트</b>를 만들어요. 학생 퀴즈는 여러 세트에서 섞어서 나와서, 같은 문제를 외워 버리지 않아요. (자료를 다시 첨부하지 않아도 돼요)</p>`}
+    <${PromptOptions} opts=${opts} setOpts=${setOpts} />
     <ol class="steps">
       <li><button class="btn small primary" onClick=${copy}>📋 지시문 복사</button>
-        <details><summary class="muted small">지시문 보기</summary><textarea class="input mono" rows="8" readonly value=${AI_PROMPT}></textarea></details></li>
-      <li><a class="btn small" href="https://claude.ai/new" target="_blank" rel="noopener">claude.ai 열기 ↗</a> 새 대화에서 <b>수업 자료(PDF·판서 이미지)를 첨부</b>하고 지시문을 붙여넣어 보내기</li>
+        <details><summary class="muted small">지시문 보기</summary><textarea class="input mono" rows="8" readonly value=${prompt}></textarea></details></li>
+      <li><a class="btn small" href="https://claude.ai/new" target="_blank" rel="noopener">claude.ai 열기 ↗</a> 새 대화에서 ${kind === 'new' ? html`<b>수업 자료(PDF·판서 이미지)를 첨부</b>하고 ` : ''}지시문을 붙여넣어 보내기</li>
       <li>클로드 답변 아래의 <b>복사</b> 버튼을 눌러 답변을 복사한 뒤, 아래 칸에 붙여넣기</li>
     </ol>
     <textarea class="input mono" rows="6" placeholder="여기에 클로드의 답변을 붙여넣으세요" value=${text} onInput=${(e) => setText(e.target.value)}></textarea>
     <div class="btn-row">
-      <label><input type="radio" checked=${mode === 'replace'} onChange=${() => setMode('replace')} /> 문제 바꾸기</label>
-      <label><input type="radio" checked=${mode === 'append'} onChange=${() => setMode('append')} /> 문제 추가하기</label>
-      <button class="btn primary" disabled=${!text.trim()} onClick=${doImport}>가져오기 ⬇</button>
+      ${kind === 'new' && html`<label><input type="radio" checked=${mode === 'replace'} onChange=${() => setMode('replace')} /> 문제 바꾸기</label>
+      <label><input type="radio" checked=${mode === 'append'} onChange=${() => setMode('append')} /> 문제 추가하기</label>`}
+      <button class="btn primary" disabled=${!text.trim()} onClick=${doImport}>${kind === 'variant' ? '새 세트로 가져오기 ⬇' : '가져오기 ⬇'}</button>
     </div>
     ${err && html`<div class="error-box pre">${err}</div>`}
   </div>`;
@@ -286,10 +315,12 @@ export function LessonEditor({ lessonId }) {
   const [saving, setSaving] = useState(false);
   const [qErrors, setQErrors] = useState({});
   const [dirty, setDirty] = useState(false);
+  const [cat, setCat] = useState({ subjects: [], topics: [] });
+  useEffect(() => { loadCatalog().then(setCat).catch(() => {}); }, []);
 
   useEffect(() => {
     if (isNew) {
-      setLesson({ id: crypto.randomUUID(), title: '', subject: '', unit: '', lesson_date: new Date().toLocaleDateString('sv-SE'),
+      setLesson({ id: crypto.randomUUID(), title: '', subject: '', unit: '', topic_id: null, lesson_date: new Date().toLocaleDateString('sv-SE'),
         grades: [], summary: '', key_points: [], flashcards: [], pages: [], published: false, _new: true });
       return;
     }
@@ -317,7 +348,13 @@ export function LessonEditor({ lessonId }) {
   const upd = (patch) => { setLesson({ ...lesson, ...patch }); setDirty(true); };
   const updQs = (next) => { setQs(next); setDirty(true); };
 
+  const maxSet = () => Math.max(1, ...qs.map((q) => q.set_no || 1));
   const onImport = (r, mode) => {
+    if (mode === 'newset') {
+      const n = maxSet() + 1;
+      updQs([...qs, ...r.questions.map((q) => ({ ...q, set_no: n, source: 'ai' }))]);
+      return;
+    }
     const L = r.lesson;
     upd({
       title: lesson.title || L.title, subject: lesson.subject || L.subject, unit: lesson.unit || L.unit,
@@ -325,7 +362,7 @@ export function LessonEditor({ lessonId }) {
       key_points: L.key_points.length ? L.key_points : lesson.key_points,
       flashcards: L.flashcards.length ? L.flashcards : lesson.flashcards,
     });
-    updQs(mode === 'append' ? [...qs, ...r.questions] : r.questions);
+    updQs(mode === 'append' ? [...qs, ...r.questions.map((q) => ({ ...q, set_no: maxSet() }))] : r.questions.map((q) => ({ ...q, set_no: 1, source: 'ai' })));
   };
 
   const save = async ({ thenPreview = false } = {}) => {
@@ -338,6 +375,7 @@ export function LessonEditor({ lessonId }) {
     try {
       const { _new, questions, created_at, ...row } = lesson;
       row.title = row.title.trim();
+      row.unit = cat.topics.find((t) => t.id === row.topic_id)?.name || '';
       const r1 = await sb.from('lessons').upsert(row);
       if (r1.error) throw r1.error;
       const rows = qs.map((q, i) => cleanQuestion(q, i, lesson.id));
@@ -360,6 +398,23 @@ export function LessonEditor({ lessonId }) {
     setSaving(false);
   };
 
+  const addTopic = async () => {
+    const name = prompt(`"${lesson.subject}" 과목에 새 주제 이름`)?.trim();
+    if (!name) return;
+    const { data, error } = await sb.from('topics').insert({ subject: lesson.subject, name }).select().single();
+    if (error) { toast('⚠️ ' + friendlyError(error)); return; }
+    setCat({ ...cat, topics: [...cat.topics, data] });
+    upd({ topic_id: data.id });
+  };
+  const addFlashQs = () => {
+    const made = flashcardQuestions(lesson.flashcards, maxSet());
+    if (!made.length) { toast('낱말 카드가 3개 이상 있어야 해요'); return; }
+    const have = new Set(qs.map((q) => q.prompt));
+    const fresh = made.filter((q) => !have.has(q.prompt));
+    updQs([...qs, ...fresh]);
+    toast(`🃏 낱말 카드 문제 ${fresh.length}개를 만들었어요`);
+  };
+
   const cardsText = lesson.flashcards.map((c) => `${c.front} : ${c.back}`).join('\n');
 
   return html`<div class="page editor">
@@ -368,8 +423,19 @@ export function LessonEditor({ lessonId }) {
 
     <div class="card form-grid">
       <label class="span2">수업 제목 *<input class="input big" value=${lesson.title} onInput=${(e) => upd({ title: e.target.value })} placeholder="예: 식물의 한살이" /></label>
-      <label>과목<input class="input" value=${lesson.subject || ''} onInput=${(e) => upd({ subject: e.target.value })} placeholder="예: 과학" /></label>
-      <label>단원<input class="input" value=${lesson.unit || ''} onInput=${(e) => upd({ unit: e.target.value })} /></label>
+      <label>과목
+        <select class="input" value=${lesson.subject || ''} onChange=${(e) => upd({ subject: e.target.value, topic_id: null })}>
+          <option value="">과목 고르기</option>
+          ${cat.subjects.filter((x) => x.active || x.name === lesson.subject).map((x) => html`<option value=${x.name}>${x.emoji} ${x.name}</option>`)}
+        </select></label>
+      <label>주제(제재)
+        <span class="topic-pick">
+          <select class="input" value=${lesson.topic_id || ''} onChange=${(e) => upd({ topic_id: e.target.value || null })} disabled=${!lesson.subject}>
+            <option value="">주제 없음</option>
+            ${cat.topics.filter((t) => t.subject === lesson.subject).map((t) => html`<option value=${t.id}>${t.name}</option>`)}
+          </select>
+          <button type="button" class="btn small" disabled=${!lesson.subject} onClick=${addTopic}>+ 새 주제</button>
+        </span></label>
       <label>수업 날짜<input class="input" type="date" value=${lesson.lesson_date || ''} onInput=${(e) => upd({ lesson_date: e.target.value })} /></label>
       <div>공개할 학년 <span class="muted small">(아무것도 안 고르면 전체)</span>
         <div class="btn-row">${GRADES.map((g) => html`<label class="check"><input type="checkbox" checked=${lesson.grades.includes(g)}
@@ -380,7 +446,7 @@ export function LessonEditor({ lessonId }) {
     </div>
 
     <${PagesEditor} lessonId=${lesson.id} pages=${lesson.pages} onChange=${(p) => upd({ pages: p })} />
-    <${AIImport} onImport=${onImport} />
+    <${AIImport} onImport=${onImport} lesson=${lesson} questions=${qs} />
 
     <div class="card">
       <h2>📝 복습 자료</h2>
@@ -396,6 +462,10 @@ export function LessonEditor({ lessonId }) {
       onChange=${(nq) => updQs(qs.map((x) => (x.id === q.id ? nq : x)))}
       onMove=${(dir) => { const a = [...qs]; [a[i], a[i + dir]] = [a[i + dir], a[i]]; updQs(a); }}
       onDelete=${() => confirm('이 문제를 지울까요?') && updQs(qs.filter((x) => x.id !== q.id))} />`)}
+    <div class="card add-q">
+      <button class="btn small good" onClick=${addFlashQs}>🃏 낱말 카드로 문제 자동 만들기</button>
+      <span class="muted small">(뜻 고르기 · 낱말 고르기 문제가 카드마다 2개씩 생겨요)</span>
+    </div>
     <div class="card add-q">문제 직접 추가:
       ${Object.entries(TYPES).map(([k, t]) => html`<button class="btn small" onClick=${() => updQs([...qs, emptyQuestion(k)])}>${t.icon} ${t.label}</button>`)}
     </div>

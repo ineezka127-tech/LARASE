@@ -171,7 +171,44 @@ export function parseAIResult(text) {
   };
 }
 
-export const AI_PROMPT = `너는 특수학급 선생님을 돕는 복습 자료 제작 도우미야.
+// ---------- 클로드 지시문 만들기 ----------
+export const PROMPT_TYPES = {
+  ox: 'O/X', mcq: '5지선다', short: '단답형', match: '짝 맞추기', order: '순서 맞추기', essay: '서술형', frac: '분수·수 답',
+};
+export const PROMPT_LEVELS = {
+  easy: ['쉬움 위주', [60, 30, 10]],
+  mix: ['골고루', [30, 50, 20]],
+  hard: ['도전 위주', [10, 40, 50]],
+};
+export const DEFAULT_PROMPT_OPTS = { count: 12, level: 'mix', types: ['ox', 'mcq', 'short', 'match', 'order', 'essay'] };
+
+const TYPE_HINT = {
+  ox: 'O/X',
+  mcq: '5지선다',
+  short: '단답형, 한두 낱말로 답하는 문제',
+  match: '짝 맞추기, 3~5쌍',
+  order: '순서 맞추기, 3~5단계 — 순서가 분명한 내용이 없으면 다른 유형으로',
+  essay: '서술형, 2~3문장으로 답하는 문제',
+  frac: '답이 분수나 수인 계산 문제',
+};
+const TYPE_WEIGHT = { ox: 3, mcq: 4, short: 3, match: 1, order: 1, essay: 1, frac: 4 };
+
+function composition({ count, level, types }) {
+  const list = types.length ? types : DEFAULT_PROMPT_OPTS.types;
+  const total = list.reduce((s, t) => s + TYPE_WEIGHT[t], 0);
+  let left = count;
+  const n = list.map((t, i) => {
+    const v = i === list.length - 1 ? left : Math.max(1, Math.round((count * TYPE_WEIGHT[t]) / total));
+    left -= v;
+    return [t, Math.max(1, v)];
+  });
+  const [e, m, h] = PROMPT_LEVELS[level]?.[1] || PROMPT_LEVELS.mix[1];
+  return `4. questions: 퀴즈 ${count}문제, 아래 구성으로
+${n.map(([t, v]) => `   - ${t} ${v}개 (${TYPE_HINT[t]})`).join('\n')}
+   - 난이도 비율: 쉬움(1) 약 ${e}%, 보통(2) 약 ${m}%, 도전(3) 약 ${h}%`;
+}
+
+const PROMPT_HEAD = `너는 특수학급 선생님을 돕는 복습 자료 제작 도우미야.
 첨부한 수업 자료(아이캔노트 판서, 학습지, 교과서 PDF·이미지)를 꼼꼼히 읽고, 학생들이 복습할 자료와 퀴즈를 만들어 줘.
 
 [학생 정보]
@@ -183,15 +220,8 @@ export const AI_PROMPT = `너는 특수학급 선생님을 돕는 복습 자료 
 1. summary: 오늘 배운 내용 요약 (5~8문장, 쉬운 말, 줄바꿈 \\n 사용 가능)
 2. key_points: 꼭 기억할 핵심 3~6개 (한 줄씩)
 3. flashcards: 중요한 낱말 카드 4~10개 (front: 낱말, back: 쉬운 뜻)
-4. questions: 퀴즈 12~15문제, 아래 구성으로
-   - ox 3개 (difficulty 1)
-   - mcq 4개 (5지선다, difficulty 2~3)
-   - short 3개 (단답형, 한두 낱말로 답하는 문제, difficulty 2)
-   - match 1개 (짝 맞추기, 3~5쌍, difficulty 1)
-   - order 1개 (순서 맞추기, 3~5단계, difficulty 2) — 순서가 분명한 내용이 없으면 생략
-   - essay 1~2개 (서술형, 2~3문장으로 답하는 문제, difficulty 3)
-   - 수학 수업이면: 답이 분수나 수인 계산 문제는 frac 유형으로 4~6개 더 만들고, 위 구성에서 short·essay를 줄여도 됨
-
+`;
+const PROMPT_RULES = `
 [규칙]
 - 자료에 있는 내용으로만 만들 것. 자료에 없는 내용은 지어내지 말 것
 - 손글씨 판서가 잘 안 보이는 부분은 문제로 내지 말 것
@@ -225,3 +255,58 @@ export const AI_PROMPT = `너는 특수학급 선생님을 돕는 복습 자료 
   ]
 }
 \`\`\``;
+
+export function buildPrompt(opts = DEFAULT_PROMPT_OPTS) {
+  return PROMPT_HEAD + composition({ ...DEFAULT_PROMPT_OPTS, ...opts }) + '\n' + PROMPT_RULES;
+}
+
+// 같은 내용으로 "다른 문제 세트" 만들기 (이미 있는 문제와 겹치지 않게)
+export function buildVariantPrompt(lesson, questions, opts = DEFAULT_PROMPT_OPTS) {
+  const o = { ...DEFAULT_PROMPT_OPTS, ...opts };
+  const old = questions.map((q, i) => `${i + 1}. [${q.type}] ${q.prompt}`).join('\n');
+  return `너는 특수학급 선생님을 돕는 복습 퀴즈 제작 도우미야.
+아래 수업 내용으로 이미 퀴즈를 한 번 만들었어. 학생들이 같은 문제에 익숙해져서 외워 버리지 않도록,
+**같은 내용이지만 새로운 문제**를 만들어 줘.
+
+[학생 정보]
+- 특수학급 학생, 읽기·이해 수준은 초등 3~6학년 정도. 짧고 쉬운 문장으로.
+
+[수업 내용]
+제목: ${lesson.title}
+요약: ${lesson.summary || ''}
+핵심: ${(lesson.key_points || []).join(' / ')}
+낱말: ${(lesson.flashcards || []).map((c) => `${c.front}=${c.back}`).join(', ')}
+
+[이미 있는 문제 — 똑같이 내지 말 것]
+${old || '(없음)'}
+
+[새 문제를 만드는 방법]
+- 같은 개념을 다른 방향에서 묻기 (예: 뜻→낱말, 낱말→뜻 / 맞는 것 고르기 ↔ 틀린 것 고르기)
+- 다른 문제 유형으로 바꾸기, 다른 예시·숫자·상황 쓰기
+- 보기의 순서와 내용을 바꾸기
+- 자료에 없는 내용은 지어내지 말 것
+
+${composition(o)}
+${PROMPT_RULES.replace(/"title"[\s\S]*?"questions": \[/, '"questions": [')}`;
+}
+
+export const AI_PROMPT = buildPrompt();
+
+// 🃏 낱말 카드로 문제 자동 만들기 (뜻 고르기 / 낱말 고르기)
+export function flashcardQuestions(cards, setNo = 1) {
+  const ok = (cards || []).filter((c) => c.front && c.back);
+  if (ok.length < 3) return [];
+  const pickOthers = (arr, i, n) => arr.filter((_, k) => k !== i).sort(() => Math.random() - 0.5).slice(0, n);
+  const out = [];
+  ok.forEach((c, i) => {
+    const wrongBacks = pickOthers(ok.map((x) => x.back), i, Math.min(4, ok.length - 1));
+    const choicesA = [c.back, ...wrongBacks].sort(() => Math.random() - 0.5);
+    out.push({ id: crypto.randomUUID(), type: 'mcq', difficulty: 1, prompt: `'${c.front}'의 뜻은 무엇일까요?`, set_no: setNo, source: 'auto',
+      data: { choices: choicesA, answer: choicesA.indexOf(c.back) + 1, explanation: `${c.front}: ${c.back}` } });
+    const wrongFronts = pickOthers(ok.map((x) => x.front), i, Math.min(4, ok.length - 1));
+    const choicesB = [c.front, ...wrongFronts].sort(() => Math.random() - 0.5);
+    out.push({ id: crypto.randomUUID(), type: 'mcq', difficulty: 2, prompt: `다음 뜻을 가진 낱말은 무엇일까요?\n"${c.back}"`, set_no: setNo, source: 'auto',
+      data: { choices: choicesB, answer: choicesB.indexOf(c.front) + 1, explanation: `${c.front}: ${c.back}` } });
+  });
+  return out;
+}

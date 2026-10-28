@@ -1,7 +1,7 @@
 // 여러 화면에서 함께 쓰는 작은 부품들
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { levelInfo, levelTitle } from '../lib/xp.js';
-import { speak, ttsSupported } from '../lib/tts.js';
+import { speak, stopSpeaking, speakingText, ttsSupported } from '../lib/tts.js';
 
 export function go(path) {
   location.hash = path;
@@ -16,10 +16,30 @@ export function ErrorBox({ error, onRetry }) {
   return html`<div class="error-box">⚠️ ${String(error)}${onRetry && html` <button class="btn small" onClick=${onRetry}>다시 시도</button>`}</div>`;
 }
 
+function useSpeaking() {
+  const [cur, setCur] = useState(speakingText());
+  useEffect(() => {
+    const on = (e) => setCur(e.detail);
+    window.addEventListener('bokseup-tts', on);
+    return () => window.removeEventListener('bokseup-tts', on);
+  }, []);
+  return cur;
+}
+
+// 🔊 읽어 주기 / ⏹ 멈추기 (같은 버튼)
 export function SpeakBtn({ text, label = '' }) {
+  const cur = useSpeaking();
   if (!ttsSupported) return null;
-  return html`<button class="speak-btn" aria-label="읽어 주기" title="읽어 주기"
-    onClick=${(e) => { e.stopPropagation(); speak(text); }}>🔊${label && html` <span>${label}</span>`}</button>`;
+  const on = cur != null && cur === String(text);
+  return html`<button class=${'speak-btn' + (on ? ' on' : '')} aria-label=${on ? '멈추기' : '읽어 주기'} title=${on ? '멈추기' : '읽어 주기'}
+    onClick=${(e) => { e.stopPropagation(); on ? stopSpeaking() : speak(text); }}>${on ? '⏹' : '🔊'}${label && html` <span>${on ? '멈추기' : label}</span>`}</button>`;
+}
+
+// 무엇이든 읽는 중이면 화면 아래에 "그만 읽기" 버튼
+export function StopReadingBar() {
+  const cur = useSpeaking();
+  if (!ttsSupported || cur == null) return null;
+  return html`<button class="stop-reading" onClick=${stopSpeaking}>⏹ 그만 읽기</button>`;
 }
 
 export function XPBar({ xp, compact = false }) {
@@ -91,6 +111,7 @@ export function RewardLayer({ onChange }) {
   }, [onChange]);
 
   return html`
+    <${StopReadingBar} />
     <div class="toasts">${toasts.map((t) => html`<div key=${t.id} class=${'toast ' + t.cls}>${t.text}</div>`)}</div>
     ${levelUp && html`<${Modal} onClose=${() => setLevelUp(null)}>
       <${Confetti} />
@@ -100,7 +121,7 @@ export function RewardLayer({ onChange }) {
         <div class="levelup-num">Lv.${levelUp.old_level} → <b>Lv.${levelUp.level}</b></div>
         <div class="levelup-title">${levelTitle(levelUp.level)}</div>
         <p class="levelup-coin">🪙 +${20 * (levelUp.level - levelUp.old_level)} 코인 보너스!</p>
-        <p class="muted">스탯 포인트 +${3 * (levelUp.level - levelUp.old_level)} · 스킬 포인트 +${levelUp.level - levelUp.old_level}<br/><small>(보드게임이 열리면 쓸 수 있어요!) · 새 아이템이 열렸는지 상점을 확인해 보세요 🛍️</small></p>
+        <p class="muted">스탯 포인트 +${levelUp.level - levelUp.old_level} · 스킬 포인트 +${levelUp.level - levelUp.old_level}<br/><small>(보드게임이 열리면 쓸 수 있어요!) · 새 아이템이 열렸는지 상점을 확인해 보세요 🛍️</small></p>
         <button class="btn big primary" onClick=${() => setLevelUp(null)}>멋져요!</button>
       </div>
     <//>`}

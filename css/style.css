@@ -514,3 +514,33 @@ a.card.stat { color: var(--ink); }
 .stat-up { min-height: 30px; padding: 0 10px; }
 .shop-top .stat-panel { max-width: 280px; margin-left: auto; }
 @media (max-width: 760px) { .shop-top .stat-panel { margin: 0 auto; } }
+
+/* 읽어 주기 멈추기 */
+.speak-btn.on { background: var(--bad-soft); color: var(--bad); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(229, 72, 77, 0.15); } }
+.stop-reading { position: fixed; left: 16px; bottom: 16px; z-index: 46; border: none; background: var(--bad); color: #fff; font: inherit; font-weight: 800; font-size: 1.05em; padding: 12px 20px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); cursor: pointer; }
+
+/* ---------- 과목·주제·기간 묶기 ---------- */
+.group-tools { display: flex; flex-direction: column; gap: 4px; }
+.group-tools .tabs { margin: 0 0 4px; }
+.group-tools .chips { margin: 4px 0; }
+.period-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.period-row .input { width: auto; }
+.group { margin-top: 18px; }
+.group-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.group-head h3 { margin: 0; font-size: 1.1em; }
+.lesson-tcard { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.lesson-tcard .btn-row { margin-top: 6px; }
+.subj-card.hidden-subj { opacity: 0.6; }
+.subj-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.subj-head h2 { margin: 0; }
+.subj-emoji { font-size: 1.6em; }
+.topic-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.topic-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--primary-soft); border-radius: 999px; padding: 4px 6px 4px 12px; font-weight: 700; }
+.topic-chip button { border: none; background: #fff; border-radius: 999px; cursor: pointer; width: 26px; height: 26px; }
+.topic-pick { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.topic-pick .input { margin: 0; flex: 1; }
+.prompt-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; background: var(--bg); border-radius: 12px; padding: 8px 12px; margin: 8px 0; }
+.prompt-opts label { margin: 0; }
+.prompt-opts select { margin-left: 6px; }
+.opt-types { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font-weight: 600; }

@@ -14,6 +14,7 @@ import { LessonList, LessonEditor } from './pages/teacher-lessons.js';
 import { GradingPage } from './pages/grading.js';
 import { StudentsPage } from './pages/teacher-students.js';
 import { ClassMode } from './pages/classmode.js';
+import { SubjectsPage } from './pages/teacher-subjects.js';
 
 const APP_NAME = window.APP_CONFIG?.APP_NAME || '복습 교실';
 
@@ -98,7 +99,7 @@ function App() {
 
   let page;
   if (p0 === 'lesson') page = html`<${LessonView} key=${p1} lessonId=${p1} ...${ctx} />`;
-  else if (p0 === 'quiz') page = html`<${QuizPage} key=${p1 + JSON.stringify(route.query)} lessonId=${p1} ...${ctx} />`;
+  else if (p0 === 'quiz') page = html`<${QuizPage} key=${route.parts.join('/') + JSON.stringify(route.query)} source=${p1 === 'topic' ? { topic: route.parts[2] } : p1 === 'range' ? { range: route.query } : { lesson: p1 }} ...${ctx} />`;
   else if (p0 === 'me' && !teacher) page = html`<${MePage} ...${ctx} />`;
   else if (p0 === 'avatar' && !teacher) page = html`<${AvatarPage} ...${ctx} />`;
   else if (p0 === 'shop' && !teacher) page = html`<${ShopPage} ...${ctx} />`;
@@ -108,6 +109,7 @@ function App() {
     else if (sub === 'lesson') page = html`<${LessonEditor} key=${route.parts[2]} lessonId=${route.parts[2]} />`;
     else if (sub === 'grading') page = html`<${GradingPage} />`;
     else if (sub === 'students') page = html`<${StudentsPage} />`;
+    else if (sub === 'subjects') page = html`<${SubjectsPage} />`;
     else if (sub === 'student') page = html`<${StudentDetail} key=${route.parts[2]} studentId=${route.parts[2]} />`;
   }
   if (!page) page = teacher ? html`<${TeacherHome} />` : html`<${StudentHome} ...${ctx} />`;

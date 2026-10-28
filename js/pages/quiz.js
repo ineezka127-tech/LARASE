@@ -130,8 +130,74 @@ function FracAnswer({ q, done, answer, onAnswer }) {
 const VIEWS = { ox: OX, mcq: MCQ, short: Short, essay: Essay, match: Match, order: Order, frac: FracAnswer };
 
 // ---------- 퀴즈 진행 ----------
-export function QuizPage({ lessonId, profile, query }) {
-  const [lesson, setLesson] = useState(null);
+// ---------- 문제 고르기: 같은 내용이라도 매번 다르게 ----------
+// 지난번에 틀린 문제 → 아직 안 푼 문제 → 나머지 순으로 뽑고, 쉬운 문제부터. 5지선다는 보기 순서도 섞어요.
+function prepare(q) {
+  if (q.type !== 'mcq') return q;
+  const order = shuffle(q.data.choices.map((_, i) => i));
+  return { ...q, _map: order, data: { ...q.data, choices: order.map((i) => q.data.choices[i]), answer: order.indexOf(q.data.answer - 1) + 1 } };
+}
+
+function drawQuestions(pool, last, n) {
+  const wrong = shuffle(pool.filter((q) => last[q.id] === false));
+  const fresh = shuffle(pool.filter((q) => !(q.id in last)));
+  const rest = shuffle(pool.filter((q) => q.id in last && last[q.id] !== false));
+  return [...wrong, ...fresh, ...rest].slice(0, n).sort((a, b) => a.difficulty - b.difficulty).map(prepare);
+}
+
+async function loadQuiz(source, profile, query) {
+  let lessons;
+  let title;
+  let backHref = '#/';
+  if (source.lesson) {
+    const { data, error } = await sb.from('lessons').select('id,title').eq('id', source.lesson);
+    if (error) throw error;
+    if (!data.length) throw new Error('수업을 찾을 수 없어요.');
+    lessons = data;
+    title = data[0].title;
+    backHref = '#/lesson/' + source.lesson;
+  } else if (source.topic) {
+    const [t, l] = await Promise.all([
+      sb.from('topics').select('*').eq('id', source.topic).maybeSingle(),
+      sb.from('lessons').select('id,title').eq('topic_id', source.topic),
+    ]);
+    if (t.error || l.error) throw t.error || l.error;
+    if (!t.data) throw new Error('주제를 찾을 수 없어요.');
+    lessons = l.data;
+    title = `🗂️ ${t.data.name} 전체 퀴즈`;
+  } else {
+    const r = source.range || {};
+    let qb = sb.from('lessons').select('id,title,lesson_date,subject');
+    if (r.from) qb = qb.gte('lesson_date', r.from).lte('lesson_date', r.to);
+    if (r.s) qb = qb.eq('subject', r.s);
+    const { data, error } = await qb;
+    if (error) throw error;
+    lessons = data;
+    const md = (x) => x.slice(5).replace('-', '/');
+    title = `🧠 ${r.s ? r.s + ' ' : ''}${r.from ? `${md(r.from)}~${md(r.to)} ` : ''}총정리 퀴즈`;
+  }
+  const ids = lessons.map((l) => l.id);
+  if (!ids.length) return { title, backHref, list: [], ref: null };
+  const [q, at] = await Promise.all([
+    sb.from('questions').select('*').in('lesson_id', ids).order('position'),
+    sb.from('attempts').select('question_id,is_correct,created_at').eq('user_id', profile.id).in('lesson_id', ids).order('created_at', { ascending: false }),
+  ]);
+  if (q.error || at.error) throw q.error || at.error;
+  const last = {};
+  at.data.forEach((a) => { if (!(a.question_id in last)) last[a.question_id] = a.is_correct; });
+  let pool = q.data;
+  const group = !source.lesson;
+  if (group) pool = pool.filter((x) => x.type !== 'essay');          // 묶음 퀴즈는 서술형 빼기
+  if (query.d) pool = pool.filter((x) => String(x.difficulty) === query.d);
+  let list;
+  if (query.wrong) list = shuffle(pool.filter((x) => last[x.id] === false)).map(prepare);
+  else list = drawQuestions(pool, last, group ? 10 : 12);
+  const ref = source.lesson ? null : source.topic ? 'topic:' + source.topic : `range:${source.range?.from || ''}:${source.range?.to || ''}:${source.range?.s || ''}`;
+  return { title, backHref, list, ref, lessonId: source.lesson || null };
+}
+
+export function QuizPage({ source, profile, query }) {
+  const [meta, setMeta] = useState(null);
   const [list, setList] = useState(null);
   const [idx, setIdx] = useState(0);
   const [answer, setAnswer] = useState(undefined);
@@ -144,28 +210,10 @@ export function QuizPage({ lessonId, profile, query }) {
   const [round, setRound] = useState(1);
 
   useEffect(() => {
-    (async () => {
-      const [l, q] = await Promise.all([
-        sb.from('lessons').select('id,title').eq('id', lessonId).maybeSingle(),
-        sb.from('questions').select('*').eq('lesson_id', lessonId).order('position'),
-      ]);
-      if (l.error || q.error) throw l.error || q.error;
-      if (!l.data) throw new Error('수업을 찾을 수 없어요.');
-      let qs = q.data;
-      if (query.d) qs = qs.filter((x) => String(x.difficulty) === query.d);
-      if (query.wrong) {
-        const { data: at, error } = await sb.from('attempts').select('question_id,is_correct,created_at')
-          .eq('user_id', profile.id).eq('lesson_id', lessonId).order('created_at', { ascending: false });
-        if (error) throw error;
-        const last = {};
-        at.forEach((a) => { if (!(a.question_id in last)) last[a.question_id] = a.is_correct; });
-        qs = qs.filter((x) => last[x.id] === false);
-      }
-      setLesson(l.data);
-      setList(qs);
-    })().catch((e) => setErr(friendlyError(e)));
+    loadQuiz(source, profile, query).then((m) => { setMeta(m); setList(m.list); }).catch((e) => setErr(friendlyError(e)));
     return () => stopSpeaking();
   }, []);
+  const lessonId = meta?.lessonId;
 
   const q = list?.[idx];
   useEffect(() => { if (q && auto) speak(q.prompt); }, [q?.id, round, auto]);
@@ -174,7 +222,7 @@ export function QuizPage({ lessonId, profile, query }) {
   if (!list) return html`<${Loading} />`;
   if (!list.length) return html`<div class="page narrow"><div class="card empty">
     <div class="big-emoji">🎉</div><p>${query.wrong ? '다시 풀 문제가 없어요. 모두 맞혔어요!' : '풀 문제가 없어요.'}</p>
-    <a class="btn primary" href=${'#/lesson/' + lessonId}>복습 자료 보기</a> <a class="btn" href="#/">홈으로</a></div></div>`;
+    ${lessonId && html`<a class="btn primary" href=${'#/lesson/' + lessonId}>복습 자료 보기</a>`} <a class="btn" href="#/">홈으로</a></div></div>`;
 
   const submit = async (ans) => {
     if (busy || result) return;
@@ -183,7 +231,8 @@ export function QuizPage({ lessonId, profile, query }) {
     const correct = checkAnswer(q, ans);
     let xp = 0;
     try {
-      const r = await rpc('submit_answer', { p_question: q.id, p_answer: ans, p_correct: correct === true, p_mode: round > 1 || query.wrong ? 'retry' : 'quiz' });
+      const stored = q._map ? q._map[ans - 1] + 1 : ans;   // 섞인 보기 번호 → 원래 번호로 저장
+      const r = await rpc('submit_answer', { p_question: q.id, p_answer: stored, p_correct: correct === true, p_mode: round > 1 || query.wrong ? 'retry' : lessonId ? 'quiz' : 'set' });
       xp = r?.xp || 0;
       reward(r);
     } catch (e) {
@@ -205,9 +254,20 @@ export function QuizPage({ lessonId, profile, query }) {
     const right = graded.filter((r) => r.correct).length;
     let bonus = null;
     if (round === 1 && !query.wrong) {
-      try { bonus = await rpc('complete_quiz', { p_lesson: lessonId, p_correct: right, p_total: graded.length }); reward(bonus); } catch {}
+      try {
+        bonus = lessonId
+          ? await rpc('complete_quiz', { p_lesson: lessonId, p_correct: right, p_total: graded.length })
+          : await rpc('complete_set', { p_ref: meta.ref, p_correct: right, p_total: graded.length });
+        reward(bonus);
+      } catch {}
     }
     setFinish({ right, total: graded.length, essays: results.length - graded.length, bonus });
+  };
+
+  // 🔁 같은 내용, 새로 뽑은 문제로 다시
+  const restart = async () => {
+    setList(null); setFinish(null); setIdx(0); setAnswer(undefined); setResult(null); setResults([]); setRound(1);
+    try { const m = await loadQuiz(source, profile, query); setMeta(m); setList(m.list); } catch (e) { setErr(friendlyError(e)); }
   };
 
   const retryWrong = () => {
@@ -229,7 +289,8 @@ export function QuizPage({ lessonId, profile, query }) {
         <p class="muted">${gained}문제를 풀었어요.</p>
         <div class="btn-col">
           ${finish.right < finish.total && html`<button class="btn big warn block" onClick=${retryWrong}>💪 틀린 문제 다시 풀기</button>`}
-          <a class="btn big block" href=${'#/lesson/' + lessonId}>📖 복습 자료 다시 보기</a>
+          <button class="btn big block" onClick=${restart}>🔁 다른 문제로 또 풀기</button>
+          ${lessonId && html`<a class="btn big block" href=${'#/lesson/' + lessonId}>📖 복습 자료 다시 보기</a>`}
           <a class="btn big primary block" href="#/">🏠 홈으로</a>
         </div>
       </div>
@@ -240,7 +301,7 @@ export function QuizPage({ lessonId, profile, query }) {
   const done = !!result;
   return html`<div class="page quiz">
     <div class="quiz-top">
-      <a class="back" href=${'#/lesson/' + lessonId}>← ${lesson.title}</a>
+      <a class="back" href=${meta.backHref}>← ${meta.title}</a>
       ${ttsSupported && html`<label class="toggle"><input type="checkbox" checked=${auto} onChange=${(e) => { setAuto(e.target.checked); setAutoRead(e.target.checked); }} /> 자동 읽기</label>`}
     </div>
     <div class="dots">${list.map((_, i) => {
