@@ -952,3 +952,103 @@ h2.mt { margin-top: 18px; }
   .app.teacher .brand span:not(.mode-tag) { display: none; }
   .hide-narrow { display: none; }
 }
+
+/* =====================================================================
+   v12: 🎲 모험 화면 — 태블릿 가로에서 한 화면에 (지도 왼쪽 · 조작판 오른쪽)
+   ===================================================================== */
+/* 기본(세로·폰): 위에서부터 상태 → 주사위 → 지도 → 나머지 */
+.game-layout { display: flex; flex-direction: column; }
+.game-side { display: contents; }
+.game-layout .game-hud { order: 1; }
+.game-layout .game-bar { order: 2; }
+.game-layout .map-wrap { order: 3; }
+.game-layout .row-card { order: 4; }
+.game-layout .friend-strip { order: 5; }
+.game-layout .legend-card { order: 6; }
+.game-layout .game-help { order: 7; }
+
+@media (min-width: 900px) and (orientation: landscape) {
+  .page.game { max-width: none; padding: 8px 12px 0; }
+  .game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; height: calc(100dvh - var(--topbar-h, 78px) - 12px); }
+  .game-side { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 0; order: 2; padding-bottom: 8px; }
+  .game-side > * { order: 0 !important; }
+  .game-side .card { margin: 0; padding: 12px 14px; }
+  .game-layout .map-wrap { order: 1; margin: 0; height: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 4px; }
+  .map-wrap .game-map { width: 100%; height: 100%; }
+  /* 상태판 */
+  .game-side .game-hud { flex-direction: column; align-items: stretch; gap: 8px; }
+  .game-side .hud-world { font-size: 0.95em; }
+  .game-side .hud-world small { display: block; }
+  .game-side .hud-hp { display: flex; align-items: center; gap: 6px; }
+  .game-side .hud-items { display: flex; gap: 6px; }
+  .game-side .hud-items .btn { flex: 1; padding: 4px 6px; }
+  /* 주사위 */
+  .game-side .game-bar { position: static; flex-direction: column; align-items: stretch; gap: 8px; text-align: center; }
+  .game-side .dice-box { justify-content: center; min-width: 0; }
+  .game-side .game-msg { font-size: 0.92em; min-height: 2.6em; }
+  .game-side .game-bar .btn.huge { min-height: 64px; font-size: 1.15em; width: 100%; flex-direction: column; gap: 0; }
+  /* 나머지는 접어서 */
+  .game-side .row-card { font-size: 0.85em; }
+  .game-side .row-card .big-emoji { font-size: 1.6em; }
+  .game-side .friend-strip { font-size: 0.85em; }
+  .game-side .friend-chip img { width: 30px; height: 30px; }
+  .game-side .map-legend { grid-template-columns: 1fr; gap: 6px; }
+  .game-side .lg-dot { width: 32px; height: 32px; font-size: 16px; }
+  .game-side .game-help { font-size: 0.85em; }
+
+  /* ⚔️ 전투: 왼쪽 몬스터·나, 오른쪽 문제 */
+  .battle-bg { padding: 10px; display: flex; align-items: center; }
+  .battle { max-width: 1240px; width: 100%; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: center; }
+  .battle-left .battle-top { grid-template-columns: 1fr; gap: 6px; }
+  .battle-left .vs { font-size: 1em; text-align: center; margin: -2px 0; }
+  .battle-left .fighter { padding: 10px 12px; gap: 4px; }
+  .battle-left .f-emoji { font-size: 3em; }
+  .battle-left .battle-log { font-size: 1.05em; margin: 6px 0 0; min-height: 1.5em; }
+  .battle .battle-q { margin: 0; max-height: calc(100dvh - 20px); overflow-y: auto; padding: 14px 16px; }
+  .battle .battle-q .q-prompt { font-size: 1.15em; margin: 6px 0 10px; }
+  .battle .battle-q .choices { gap: 8px; }
+  .battle .battle-q .choice { min-height: 52px; padding: 8px 14px; }
+  .battle .battle-q .ox-btn { height: 130px; font-size: 4em; }
+}
+/* 아주 낮은 가로 화면(키보드가 올라온 경우 등) */
+@media (min-width: 900px) and (orientation: landscape) and (max-height: 620px) {
+  .battle-left .f-emoji { font-size: 2.2em; }
+  .battle-left .f-avatar .avatar-img { width: 54px !important; height: 76px !important; }
+  .battle .battle-q .ox-btn { height: 100px; font-size: 3.2em; }
+}
+@media (min-width: 900px) and (orientation: landscape) {
+  .app.student main:has(.page.game) { padding-bottom: 0; }
+  body:has(.page.game) { overflow: hidden; }
+}
+
+/* 📝 퀴즈: 태블릿 가로에서 스크롤 줄이기 */
+@media (min-width: 900px) and (orientation: landscape) {
+  .page.quiz { padding-top: 8px; }
+  .page.quiz .quiz-top { margin-bottom: 0; }
+  .page.quiz .dots { margin: 2px 0 6px; }
+  .page.quiz .card.question { padding: 14px 18px; }
+  /* 분수: 답 칸 왼쪽 · 숫자판(펜) 오른쪽 */
+  .frac-input:has(.fi-panel) { flex-direction: row; align-items: center; gap: 20px; }
+  .frac-input .fi-display { flex: none; }
+  .frac-input .fi-panel { flex: 1; min-width: 0; margin: 0; }
+  .frac-input .keypad .key { min-height: 50px; padding: 4px; }
+  .frac-input .penpad { max-height: 240px; }
+  /* 정답/오답 안내와 "다음 문제" 버튼은 화면 아래에 붙어 있게 */
+  .page.quiz .feedback { position: sticky; bottom: 8px; z-index: 10; box-shadow: var(--shadow-lg); }
+}
+@media (min-width: 900px) and (orientation: landscape) {
+  .short > .btn.primary, .essay > .btn.primary, .match ~ .btn.primary, .order > .btn.primary { position: sticky; bottom: 8px; z-index: 5; box-shadow: 0 6px 20px rgba(82, 98, 240, 0.35); }
+  .frac-input .keypad { gap: 6px; }
+  .frac-input .keypad .key { height: 48px; min-height: 0; font-size: 1.4em; }
+  .frac-input .fi-panel .center-row { margin-top: 6px; }
+  .frac-input .fi-panel .center-row .btn { min-height: 38px; padding: 4px 14px; }
+  .frac-input .fi-tabs { margin-bottom: 6px; }
+  .frac-input .fi-panel { padding: 8px 10px; }
+}
+@media (min-width: 900px) and (orientation: landscape) {
+  .app.student main:has(.page.quiz) { padding-bottom: 0; }
+  .page.quiz { padding-bottom: 6px; }
+  .page.quiz .card.question { margin-bottom: 8px; }
+  .page.quiz .q-prompt { margin: 4px 0 8px; }
+}
+@media (min-width: 900px) and (orientation: landscape) { .frac-input .keypad .key.fn { font-size: 0.95em; } }

@@ -231,6 +231,7 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
   const bar = (v, m, cls) => html`<div class=${'hpbar ' + cls}><div style=${`width:${Math.max(0, (v / m) * 100)}%`}></div><span>${v} / ${m}</span></div>`;
   const done = answer !== null;
   return html`<div class="battle">
+    <div class="battle-left">
     <div class="battle-top">
       <div class=${'fighter enemy ' + (fx === 'hit-enemy' ? 'shake' : '')}>
         <div class="f-emoji">${enemy.emoji}</div>
@@ -248,6 +249,7 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
       </div>
     </div>
     <div class="battle-log">${log || (phase === 'intro' ? `${enemy.emoji} ${enemy.name}이(가) 나타났다!` : '')}</div>
+    </div>
     ${q && (phase === 'attack' || phase === 'defend') && html`<div class=${'card battle-q ' + phase}>
       <div class="bq-head"><b>${phase === 'attack' ? '⚔️ 공격 차례 — 맞히면 공격!' : '🛡️ 방어 차례 — 맞히면 막아요!'}</b>
         <span class=${'timer' + (left <= 10 ? ' low' : '')}>⏱️ ${left}초</span></div>
@@ -295,6 +297,12 @@ export function GamePage({ profile, refreshProfile }) {
       setPool(mine.filter((x) => x.type === 'mcq').length >= 5 && mine.filter((x) => x.type === 'ox').length >= 3 ? mine : ok);
     } catch (e) { setErr(friendlyError(e)); }
   };
+  // 머리글 높이만큼 빼고 지도를 화면에 꽉 차게 (태블릿 가로)
+  useEffect(() => {
+    const set = () => { const h = document.querySelector('.topbar')?.offsetHeight; if (h) document.documentElement.style.setProperty('--topbar-h', h + 'px'); };
+    set(); window.addEventListener('resize', set);
+    return () => window.removeEventListener('resize', set);
+  }, []);
   useEffect(() => { load(); liveReport(profile, { page: 'game', lesson_id: null, title: '모험 지도', question_id: null, draft: null, answered: false, correct: null, q_index: null, q_total: null }); }, []);
 
   if (err) return html`<div class="page"><${ErrorBox} error=${err} onRetry=${load} /></div>`;
@@ -423,6 +431,8 @@ export function GamePage({ profile, refreshProfile }) {
 
   const ti = TILE_INFO[tile.type];
   return html`<div class="page game">
+    <div class="game-layout">
+    <aside class="game-side">
     <div class="game-hud card">
       <div class="hud-world">${w.emoji} <b>월드 ${st.world} · ${w.name}</b> <small class="muted">이 지역 추천 레벨 ${makeEnemy(st.world, 2).lv}</small></div>
       <div class="hud-hp"><span>❤️</span><div class="hpbar me"><div style=${`width:${(hp / mhp) * 100}%`}></div><span>${hp} / ${mhp}</span></div></div>
@@ -438,15 +448,10 @@ export function GamePage({ profile, refreshProfile }) {
       <button class="btn huge primary" disabled=${busy || !!battle || !!choices || st.rolls_left <= 0} onClick=${roll}>
         ${st.stuck > 0 ? '🏝️ 탈출 굴리기' : tile.type === 'gate' ? `🎲🎲 길목 도전 (${tile.need}+)` : '🎲 주사위 굴리기'} <small>(남은 ${st.rolls_left}번)</small></button>
     </div>
-    <div class="map-wrap">
-      <${GameMap} world=${st.world} tile=${st.tile} defeated=${st.defeated || []} choices=${choices} onChoose=${(id) => chooseRef.current?.(id)}
-        onInfo=${(t) => !busy && setMsg(`${TILE_INFO[t.type][0] || '👣'} ${TILE_INFO[t.type][1]} — ${t.type === 'gate' ? `주사위 2개 합이 ${t.need} 이상이면 통과` : LEGEND_DESC[t.type]}`)}
-        avatarUri=${avatarUri} myName=${(profile.display_name || '나').slice(0, 4)} friends=${friends} />
-    </div>
     ${friends.length > 0 && html`<div class="card friend-strip"><b>👫 친구들은 어디까지 갔을까?</b>
       <div class="friend-list">${[...friends].sort((a, b) => b.world - a.world || (ORDER[b.tile] ?? 0) - (ORDER[a.tile] ?? 0)).map((f) => html`<div class=${'friend-chip' + (f.world === st.world ? ' same' : '')}>
         <img src=${f.uri} alt="" /><span><b>${f.display_name || '친구'}</b><small>${worldInfo(f.world).emoji} 월드 ${f.world} · ${Math.round(((ORDER[f.tile] ?? 0) / 28) * 100)}%</small></span></div>`)}</div></div>`}
-    <details class="card legend-card" open><summary><b>🗺️ 지도 표시 보기</b> <small class="muted">(칸을 누르면 설명이 나와요)</small></summary><${MapLegend} world=${st.world} /></details>
+    <details class="card legend-card"><summary><b>🗺️ 지도 표시 보기</b> <small class="muted">(칸을 누르면 설명이 나와요)</small></summary><${MapLegend} world=${st.world} /></details>
 
     ${st.rolls_left <= 0 && html`<div class="card row-card highlight"><span class="big-emoji">📚</span><div><b>오늘 주사위를 다 썼어요!</b><div class="muted">복습 퀴즈를 끝까지 풀면 주사위를 1번 더 받아요 (하루 최대 3번). 내일 다시 5번이 채워져요.</div></div></div>`}
 
@@ -462,6 +467,13 @@ export function GamePage({ profile, refreshProfile }) {
         <li>체력은 매일 아침 다시 가득 차요</li>
       </ul>
     </details>
+    </aside>
+    <div class="map-wrap">
+      <${GameMap} world=${st.world} tile=${st.tile} defeated=${st.defeated || []} choices=${choices} onChoose=${(id) => chooseRef.current?.(id)}
+        onInfo=${(t) => !busy && setMsg(`${TILE_INFO[t.type][0] || '👣'} ${TILE_INFO[t.type][1]} — ${t.type === 'gate' ? `주사위 2개 합이 ${t.need} 이상이면 통과` : LEGEND_DESC[t.type]}`)}
+        avatarUri=${avatarUri} myName=${(profile.display_name || '나').slice(0, 4)} friends=${friends} />
+    </div>
+    </div>
 
     ${battle && html`<div class="battle-bg"><${Battle} enemy=${battle.enemy} stats=${stats} hp=${hp} items=${st.items || {}} pool=${pool} onEnd=${endBattle} onUseItem=${useItem} cfg=${profile.avatar_cfg} /></div>`}
     ${popup && html`<${Modal} onClose=${() => setPopup(null)}>
