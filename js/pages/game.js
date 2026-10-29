@@ -8,6 +8,7 @@ import { Loading, ErrorBox, Modal, SpeakBtn, reward, toast, shuffle } from '../c
 import { RichText } from '../components/math.js';
 import { AvatarImg } from '../components/avatar-ui.js';
 import { liveReport } from '../lib/live.js';
+import { sfx, music, stopMusic, soundPrefs, setSound, onSoundChange } from '../lib/sound.js';
 
 const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -173,11 +174,12 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
     const nq = pick(ph === 'attack' ? 'mcq' : 'ox');
     setQ(nq); setAnswer(null); setPhase(ph); setLeft(ph === 'attack' ? 60 : 30);
   };
-  useEffect(() => { const t = setTimeout(() => ask('attack'), 1200); return () => clearTimeout(t); }, []);
+  useEffect(() => { sfx(start.kind === 'boss' ? 'boss' : 'appear'); const t = setTimeout(() => ask('attack'), 1200); return () => clearTimeout(t); }, []);
   useEffect(() => {
     if (answer !== null || !q || (phase !== 'attack' && phase !== 'defend')) return;
     timer.current = setInterval(() => setLeft((s) => {
       if (s <= 1) { clearInterval(timer.current); resolve('__timeout__'); return 0; }
+      if (s <= 11) sfx('tick');
       return s - 1;
     }), 1000);
     return () => clearInterval(timer.current);
@@ -190,6 +192,7 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
     const correct = ans !== '__timeout__' && checkAnswer(q, ans) === true;
     const stored = q._map && ans !== '__timeout__' ? q._map[ans - 1] + 1 : ans;
     rpc('submit_answer', { p_question: q.id, p_answer: stored === '__timeout__' ? null : stored, p_correct: correct, p_mode: 'game' }).catch(() => {});
+    sfx(correct ? 'correct' : 'wrong');
     await wait(900);
     if (phase === 'attack') {
       if (correct) {
@@ -197,11 +200,12 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
         const dmg = playerDamage(stats, enemy, crit);
         const ehp = Math.max(0, enemy.hp - dmg);
         setEnemy({ ...enemy, hp: ehp });
-        setFx('hit-enemy');
+        setFx('hit-enemy'); sfx(crit ? 'crit' : 'attack');
         setLog(crit ? `💥 크리티컬! ${dmg} 피해!` : `⚔️ 공격 성공! ${dmg} 피해!`);
         await wait(1000); setFx('');
-        if (ehp <= 0) { setPhase('win'); setLog(`🎉 ${enemy.name}을(를) 물리쳤어요!`); await wait(900); onEnd({ won: true, hp }); return; }
+        if (ehp <= 0) { sfx('win'); setPhase('win'); setLog(`🎉 ${enemy.name}을(를) 물리쳤어요!`); await wait(900); onEnd({ won: true, hp }); return; }
       } else {
+        sfx('miss');
         setLog(ans === '__timeout__' ? '⏰ 시간이 다 됐어요. 공격이 빗나갔어요!' : '💨 공격이 빗나갔어요!');
         await wait(1000);
       }
@@ -211,10 +215,12 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
       const dmg = enemyDamage(enemy, block);
       const nhp = Math.max(0, hp - dmg);
       setFx('hit-me');
+      if (correct) sfx('block');
+      if (dmg > 0) setTimeout(() => sfx('hurt'), correct ? 250 : 0);
       setLog(`${correct ? `🛡️ 막기 성공! 방패 ${block}` : '😣 방어 실패!'} → ${dmg > 0 ? `${dmg} 피해` : '피해 없음!'}`);
       setHp(nhp);
       await wait(1100); setFx('');
-      if (nhp <= 0) { setPhase('lose'); setLog('😵 쓰러졌어요…'); await wait(1000); onEnd({ won: false, hp: 0 }); return; }
+      if (nhp <= 0) { sfx('lose'); setPhase('lose'); setLog('😵 쓰러졌어요…'); await wait(1000); onEnd({ won: false, hp: 0 }); return; }
       ask('attack');
     }
   };
@@ -225,6 +231,7 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
     if (!ok) return;
     const heal = kind === 'big_potion' ? mhp : Math.ceil(mhp / 2);
     setHp(Math.min(mhp, hp + heal));
+    sfx('heal');
     toast(`${ITEM_INFO[kind][0]} 체력 회복!`);
   };
 
@@ -263,6 +270,16 @@ function Battle({ enemy: start, stats, hp: hp0, items, pool, onEnd, onUseItem, c
   </div>`;
 }
 
+// 🔊 음악·효과음 켜고 끄기
+function SoundToggle() {
+  const [p, setP] = useState(soundPrefs());
+  useEffect(() => onSoundChange(setP), []);
+  return html`<div class="sound-toggle">
+    <button type="button" class=${'btn small' + (p.music ? ' on' : '')} title="배경 음악" onClick=${() => setSound({ music: !p.music })}>${p.music ? '🎵 음악' : '🔇 음악'}</button>
+    <button type="button" class=${'btn small' + (p.sfx ? ' on' : '')} title="효과음" onClick=${() => { setSound({ sfx: !p.sfx }); if (!p.sfx) setTimeout(() => sfx('correct'), 50); }}>${p.sfx ? '🔔 효과음' : '🔕 효과음'}</button>
+  </div>`;
+}
+
 // ---------- 게임 화면 ----------
 export function GamePage({ profile, refreshProfile }) {
   const [st, setSt] = useState(null);
@@ -297,6 +314,10 @@ export function GamePage({ profile, refreshProfile }) {
       setPool(mine.filter((x) => x.type === 'mcq').length >= 5 && mine.filter((x) => x.type === 'ox').length >= 3 ? mine : ok);
     } catch (e) { setErr(friendlyError(e)); }
   };
+  // 🎵 지도에서는 평화로운 곡, 전투에서는 긴박한 곡 (보스는 더 무섭게)
+  useEffect(() => { music('peace'); return () => stopMusic(); }, []);
+  useEffect(() => { music(battle ? (battle.enemy.kind === 'boss' ? 'boss' : 'battle') : 'peace'); }, [!!battle]);
+
   // 머리글 높이만큼 빼고 지도를 화면에 꽉 차게 (태블릿 가로)
   useEffect(() => {
     const set = () => { const h = document.querySelector('.topbar')?.offsetHeight; if (h) document.documentElement.style.setProperty('--topbar-h', h + 'px'); };
@@ -341,10 +362,12 @@ export function GamePage({ profile, refreshProfile }) {
       const r = await rpc('game_reward', { p_kind: 'chest', p_tile: t.id, p_z: zoneOf(s.world, ORDER[t.id]) });
       if (r.state) setSt((x) => ({ ...x, ...r.state }));
       setPopup({ icon: '🎁', title: '보물 상자!', lines: [r.coins ? `🪙 +${r.coins}` : '', r.item ? `${ITEM_INFO[r.item][0]} ${ITEM_INFO[r.item][1]}` : '', r.lucky ? '🍀 행운 보너스!' : ''] });
+      sfx('chest');
       reward(r); refreshProfile();
       return;
     }
     if (t.type === 'trap') {
+      sfx('trap');
       const lose = Math.max(1, Math.round(mhp * 0.2));
       const nhp = Math.max(1, (s.hp ?? mhp) - lose);
       await save({ hp: nhp });
@@ -352,11 +375,13 @@ export function GamePage({ profile, refreshProfile }) {
       return;
     }
     if (t.type === 'rest') {
+      sfx('heal');
       await save({ hp: null, checkpoint: t.id });
       setPopup({ icon: '⛲', title: '쉼터', lines: ['체력이 모두 회복됐어요!', '여기가 새 출발점이 돼요 (쓰러지면 여기서 다시 시작)'] });
       return;
     }
     if (t.type === 'island') {
+      sfx('island');
       await save({ stuck: 1 });
       setPopup({ icon: '🏝️', title: '무인도에 도착!', lines: ['다음 차례에 주사위 2개가 같은 숫자(더블)면 바로 탈출해요.', '아니면 한 번 쉬고 나와요.'] });
       return;
@@ -374,6 +399,7 @@ export function GamePage({ profile, refreshProfile }) {
       cur = TILE[nextId];
       s = { ...s, tile: cur.id };
       setSt(s);
+      sfx('step');
       await wait(320);
       const blocks = BLOCKING.includes(cur.type) && !(cur.type !== 'gate' && s.defeated.includes(cur.id));
       if (blocks) break;
@@ -389,9 +415,11 @@ export function GamePage({ profile, refreshProfile }) {
       const atGate = tile.type === 'gate';
       const two = atGate || st.stuck > 0;
       setDice({ rolling: true, count: two ? 2 : 1 });
+      sfx('dice');
       const r = await rpc('game_roll', { p_count: two ? 2 : 1 });
       await wait(700);
       setDice({ values: r.dice, lucky: r.lucky });
+      sfx('diceLand'); if (r.lucky) setTimeout(() => sfx('lucky'), 300);
       const s = { ...st, rolls_left: r.rolls_left };
       setSt(s);
       if (st.stuck > 0) {
@@ -399,8 +427,8 @@ export function GamePage({ profile, refreshProfile }) {
         else { setMsg('🏝️ 이번엔 쉬어요. 다음 차례엔 나갈 수 있어요.'); await save({ stuck: 0 }); }
       } else if (atGate) {
         const sum = r.dice[0] + r.dice[1];
-        if (sum >= tile.need) { setMsg(`💪 ${sum}! 험한 길목을 지나가요!`); await move(s, r.dice[0]); }
-        else setMsg(`😅 ${sum}… ${tile.need} 이상이 필요해요. 다음 차례에 다시 도전!`);
+        if (sum >= tile.need) { sfx('correct'); setMsg(`💪 ${sum}! 험한 길목을 지나가요!`); await move(s, r.dice[0]); }
+        else { sfx('wrong'); setMsg(`😅 ${sum}… ${tile.need} 이상이 필요해요. 다음 차례에 다시 도전!`); }
       } else {
         await move(s, r.dice[0]);
       }
@@ -436,6 +464,7 @@ export function GamePage({ profile, refreshProfile }) {
     <div class="game-hud card">
       <div class="hud-world">${w.emoji} <b>월드 ${st.world} · ${w.name}</b> <small class="muted">이 지역 추천 레벨 ${makeEnemy(st.world, 2).lv}</small></div>
       <div class="hud-hp"><span>❤️</span><div class="hpbar me"><div style=${`width:${(hp / mhp) * 100}%`}></div><span>${hp} / ${mhp}</span></div></div>
+      <${SoundToggle} />
       <div class="hud-stats">⚔️${stats.atk} 🛡️${stats.def} 🍀${stats.luck}</div>
       <div class="hud-items">${Object.entries(ITEM_INFO).map(([k, [icon, name, desc]]) => html`<button class="btn small" title=${desc}
         disabled=${!(st.items?.[k] > 0) || (k !== 'dice' && hp >= mhp)}

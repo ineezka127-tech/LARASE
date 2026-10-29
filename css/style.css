@@ -1052,3 +1052,7 @@ h2.mt { margin-top: 18px; }
   .page.quiz .q-prompt { margin: 4px 0 8px; }
 }
 @media (min-width: 900px) and (orientation: landscape) { .frac-input .keypad .key.fn { font-size: 0.95em; } }
+/* 🔊 소리 켜기/끄기 */
+.sound-toggle { display: flex; gap: 6px; }
+.sound-toggle .btn { flex: 1; color: var(--muted); }
+.sound-toggle .btn.on { color: var(--ink); background: #f3f0ff; border-color: #d0bfff; }
