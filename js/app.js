@@ -19,6 +19,7 @@ import { SubjectsPage } from './pages/teacher-subjects.js';
 import { GamePage } from './pages/game.js';
 import { LiveDashboard } from './pages/teacher-live.js';
 import { ReportPage } from './pages/teacher-report.js';
+import { StatsPage } from './pages/teacher-stats.js';
 
 const APP_NAME = window.APP_CONFIG?.APP_NAME || '복습 교실';
 
@@ -46,11 +47,11 @@ function Header({ profile }) {
     <a class="brand" href="#/">${teacher ? '🧑‍🏫' : '📚'} <span>${APP_NAME}</span>${teacher && html`<span class="mode-tag">선생님</span>`}</a>
     <nav>
       ${teacher
-        ? html`${link('#/', '📊 현황')}${link('#/t/live', '📡 실시간')}${link('#/t/lessons', '📚 수업 자료')}${link('#/t/grading', '📝 채점')}${link('#/t/students', '👥 학생')}${link('#/t/report', '📄 리포트')}${link('#/shop', '🛍️ 상점')}`
+        ? html`${link('#/', '📊 현황')}${link('#/t/live', '📡 실시간')}${link('#/t/stats', '📊 통계')}${link('#/t/lessons', '📚 수업 자료')}${link('#/t/grading', '📝 채점')}${link('#/t/students', '👥 학생')}${link('#/t/report', '📄 리포트')}`
         : html`${link('#/', '🏠 홈')}${link('#/game', '🎲 모험')}${link('#/avatar', '🧑‍🎨 꾸미기')}${link('#/shop', '🛍️ 상점')}${link('#/me', '🙋 내 정보')}`}
     </nav>
     ${teacher
-      ? html`<a class="btn small" href=${OTHER_PAGE} target="_blank" rel="noopener" title="학생 페이지를 새 탭으로 열어요 (테스트 계정으로 들어가 보세요)">👀 학생 화면</a><${PraiseButton} className="btn small good" label="🎁 칭찬" /><button class="btn small ghost" onClick=${() => sb.auth.signOut()}>로그아웃</button>`
+      ? html`<a class="btn small" href=${OTHER_PAGE} target="_blank" rel="noopener" title="학생 페이지를 새 탭으로 열어요 (테스트 계정으로 들어가 보세요)">👀<span class="hide-narrow"> 학생 화면</span></a><${PraiseButton} className="btn small good" label="🎁 칭찬" /><button class="btn small ghost" onClick=${() => sb.auth.signOut()}>로그아웃</button>`
       : html`<a class="me-chip" href="#/me"><${AvatarImg} cfg=${profile.avatar_cfg} size=${40} /><span class="me-chip-body"><${XPBar} xp=${profile.xp} compact /><span class="coin-chip">🪙 ${profile.coins ?? 0}</span></span></a>`}
   </header>`;
 }
@@ -134,6 +135,7 @@ function App() {
     else if (sub === 'students') page = html`<${StudentsPage} />`;
     else if (sub === 'subjects') page = html`<${SubjectsPage} />`;
     else if (sub === 'live') page = html`<${LiveDashboard} />`;
+    else if (sub === 'stats') page = html`<${StatsPage} lessonId=${route.parts[2]} />`;
     else if (sub === 'report') page = html`<${ReportPage} studentId=${route.parts[2]} />`;
     else if (sub === 'student') page = html`<${StudentDetail} key=${route.parts[2]} studentId=${route.parts[2]} />`;
   }

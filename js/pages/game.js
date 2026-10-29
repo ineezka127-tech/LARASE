@@ -7,6 +7,7 @@ import { MAP, TILE, BLOCKING, TILE_INFO, ITEM_INFO, worldInfo, zoneOf, ORDER, ma
 import { Loading, ErrorBox, Modal, SpeakBtn, reward, toast, shuffle } from '../components/ui.js';
 import { RichText } from '../components/math.js';
 import { AvatarImg } from '../components/avatar-ui.js';
+import { liveReport } from '../lib/live.js';
 
 const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -294,7 +295,7 @@ export function GamePage({ profile, refreshProfile }) {
       setPool(mine.filter((x) => x.type === 'mcq').length >= 5 && mine.filter((x) => x.type === 'ox').length >= 3 ? mine : ok);
     } catch (e) { setErr(friendlyError(e)); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); liveReport(profile, { page: 'game', lesson_id: null, title: '모험 지도', question_id: null, draft: null, answered: false, correct: null, q_index: null, q_total: null }); }, []);
 
   if (err) return html`<div class="page"><${ErrorBox} error=${err} onRetry=${load} /></div>`;
   if (!st || !pool) return html`<${Loading} text="모험 지도를 펼치는 중…" />`;

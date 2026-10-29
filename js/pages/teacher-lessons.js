@@ -53,6 +53,7 @@ export function LessonList() {
           <button class=${'btn small ' + (l.published ? 'good' : '')} onClick=${() => togglePublish(l)}>${l.published ? '✅ 공개 중' : '🙈 숨김'}</button>
           <a class="btn small" href=${'#/t/lesson/' + l.id}>✏️ 편집</a>
           <a class="btn small" href=${'#/class/' + l.id}>📺</a>
+          <a class="btn small" title="문항 통계" href=${'#/t/stats/' + l.id}>📊</a>
           <a class="btn small" href=${'#/lesson/' + l.id}>👀</a>
           <button class="btn small ghost" onClick=${() => remove(l)}>🗑️</button>
         </div>

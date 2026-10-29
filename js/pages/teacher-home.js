@@ -89,6 +89,7 @@ export function TeacherHome() {
     <div class="home-tools">
       <a class="card live-link" href="#/t/live"><span class="live-dot"></span><b>📡 실시간 현황</b><small class="muted">지금 누가 무엇을 풀고 있는지</small></a>
       <a class="card live-link" href="#/t/report"><b>📄 학습 리포트</b><small class="muted">개별화교육용 .md 내려받기</small></a>
+      <a class="card live-link" href="#/shop"><b>🛍️ 상점 미리보기</b><small class="muted">학생이 보는 상점 그대로</small></a>
       <${StorageCard} />
     </div>
 

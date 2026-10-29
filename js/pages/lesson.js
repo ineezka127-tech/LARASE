@@ -2,6 +2,7 @@ import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { signedUrls } from '../lib/files.js';
 import { DIFFICULTY, tierOf } from '../lib/questions.js';
+import { liveReport } from '../lib/live.js';
 import { Loading, ErrorBox, SpeakBtn, Modal, reward, fmtDate } from '../components/ui.js';
 import { RichText } from '../components/math.js';
 
@@ -62,6 +63,7 @@ export function LessonView({ lessonId, profile }) {
       setQs(q.data);
       if (!l.data.summary && l.data.pages.length) setTab('pages');
       rpc('record_view', { p_lesson: lessonId }).then(reward).catch(() => {});
+      liveReport(profile, { page: 'lesson', lesson_id: lessonId, title: l.data.title, question_id: null, draft: null, answered: false, correct: null, q_index: null, q_total: null });
     })().catch((e) => setErr(friendlyError(e)));
   }, [lessonId]);
 

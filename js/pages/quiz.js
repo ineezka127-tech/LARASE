@@ -5,6 +5,7 @@ import { speak, stopSpeaking, getAutoRead, setAutoRead, ttsSupported } from '../
 import { Loading, ErrorBox, SpeakBtn, reward, shuffle, toast } from '../components/ui.js';
 import { RichText, FractionInput } from '../components/math.js';
 import { checkFraction, isComplete } from '../lib/fraction.js';
+import { liveWatch, liveReport, liveDraft, cancelDraft } from '../lib/live.js';
 
 const NUMS = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
 
@@ -33,28 +34,28 @@ function MCQ({ q, done, answer, onAnswer }) {
   })}</div>`;
 }
 
-function Short({ q, done, answer, onAnswer }) {
+function Short({ q, done, answer, onAnswer, onDraft }) {
   const [v, setV] = useState('');
   const ref = useRef();
   useEffect(() => { if (!done) ref.current?.focus(); }, [q.id]);
   return html`<form class="short" onSubmit=${(e) => { e.preventDefault(); if (v.trim()) onAnswer(v.trim()); }}>
     <input ref=${ref} class=${'input huge center' + (done ? (checkAnswer(q, answer) ? ' right' : ' wrong') : '')}
-      value=${done ? answer : v} disabled=${done} onInput=${(e) => setV(e.target.value)} placeholder="정답을 써 보세요" />
+      value=${done ? answer : v} disabled=${done} onInput=${(e) => { setV(e.target.value); onDraft?.(e.target.value); }} placeholder="정답을 써 보세요" />
     ${!done && html`<button class="btn big primary" disabled=${!v.trim()}>확인 ✔</button>`}
   </form>`;
 }
 
-function Essay({ q, done, answer, onAnswer }) {
+function Essay({ q, done, answer, onAnswer, onDraft }) {
   const [v, setV] = useState('');
   return html`<div class="essay">
-    <textarea class="input" rows="5" value=${done ? answer : v} disabled=${done} onInput=${(e) => setV(e.target.value)} placeholder="생각을 2~3문장으로 써 보세요"></textarea>
+    <textarea class="input" rows="5" value=${done ? answer : v} disabled=${done} onInput=${(e) => { setV(e.target.value); onDraft?.(e.target.value); }} placeholder="생각을 2~3문장으로 써 보세요"></textarea>
     ${!done && html`<button class="btn big primary" disabled=${v.trim().length < 2} onClick=${() => onAnswer(v.trim())}>제출하기 📮</button>`}
   </div>`;
 }
 
 const PAIR_COLORS = ['#ffd6a5', '#caffbf', '#9bf6ff', '#bdb2ff', '#ffc6ff', '#fdffb6', '#a0c4ff'];
 
-function Match({ q, done, answer, onAnswer }) {
+function Match({ q, done, answer, onAnswer, onDraft }) {
   const pairs = q.data.pairs;
   const rights = useMemo(() => shuffle(pairs.map((p) => p[1])), [q.id]);
   const [sel, setSel] = useState(null);
@@ -72,6 +73,7 @@ function Match({ q, done, answer, onAnswer }) {
     if (prev != null) delete m[prev];
     m[sel] = r;
     setMap(m);
+    onDraft?.(pairs.map((_, i) => m[i] ?? null));
     const next = pairs.findIndex((_, i) => m[i] == null);
     setSel(next >= 0 ? next : null);
   };
@@ -95,14 +97,15 @@ function Match({ q, done, answer, onAnswer }) {
   </div>`;
 }
 
-function Order({ q, done, answer, onAnswer }) {
+function Order({ q, done, answer, onAnswer, onDraft }) {
   const items = q.data.items;
   const pool0 = useMemo(() => {
     let s = shuffle(items);
     for (let t = 0; t < 5 && items.length > 1 && s.every((x, i) => x === items[i]); t++) s = shuffle(items);
     return s;
   }, [q.id]);
-  const [picked, setPicked] = useState([]);
+  const [picked, setPickedS] = useState([]);
+  const setPicked = (x) => { setPickedS(x); onDraft?.(x); };
   const cur = done ? answer || [] : picked;
   const pool = pool0.filter((x) => !cur.includes(x));
   return html`<div class="order">
@@ -117,12 +120,12 @@ function Order({ q, done, answer, onAnswer }) {
   </div>`;
 }
 
-function FracAnswer({ q, done, answer, onAnswer }) {
+function FracAnswer({ q, done, answer, onAnswer, onDraft }) {
   const [v, setV] = useState({ w: '', n: '', d: '' });
   const cur = done ? answer : v;
   const ok = done && checkFraction(q.data, answer).correct;
   return html`<div class="frac-q">
-    <${FractionInput} value=${cur} onChange=${setV} disabled=${done} resultClass=${done ? (ok ? 'right' : 'wrong') : ''} />
+    <${FractionInput} value=${cur} onChange=${(x) => { setV(x); onDraft?.(x); }} disabled=${done} resultClass=${done ? (ok ? 'right' : 'wrong') : ''} />
     ${!done && html`<button class="btn big primary block" disabled=${!isComplete(v)} onClick=${() => onAnswer(v)}>확인 ✔</button>`}
   </div>`;
 }
@@ -285,15 +288,24 @@ export function QuizPage({ source, profile, query }) {
   const [level, setLevel] = useState(1);
   const [offer, setOffer] = useState(false);   // 🌟 보너스 도전 할까요?
   const [extra, setExtra] = useState(0);       // 보너스 문제 수
+  const [watching, setWatching] = useState(false);   // 👀 선생님이 지켜보는 중
 
   useEffect(() => {
     loadQuiz(source, profile, query).then((m) => { setMeta(m); setList(m.list); setLevel(m.adaptive?.level || 1); }).catch((e) => setErr(friendlyError(e)));
-    return () => stopSpeaking();
+    liveWatch(true).then((w) => setWatching(!!w.on));
+    return () => { stopSpeaking(); cancelDraft(); liveReport(profile, { page: 'away', question_id: null, draft: null, answered: false, correct: null }); };
   }, []);
   const lessonId = meta?.lessonId;
 
   const q = list?.[idx];
   useEffect(() => { if (q && auto) speak(q.prompt); }, [q?.id, round, auto]);
+  // 👀 지켜보기: 새 문제로 넘어가면 알려요
+  useEffect(() => {
+    if (!q || !meta) return;
+    const n = meta.adaptive && round === 1 ? meta.adaptive.n + extra : list.length;
+    liveReport(profile, { page: 'quiz', lesson_id: meta.lessonId, title: meta.title, question_id: q.id, q_index: idx + 1, q_total: n, draft: null, answered: false, correct: null });
+    liveWatch().then((w) => setWatching(!!w.on));
+  }, [q?.id, round]);
 
   if (err) return html`<div class="page"><${ErrorBox} error=${err} /><a class="btn" href="#/">← 홈으로</a></div>`;
   if (!list) return html`<${Loading} />`;
@@ -306,6 +318,8 @@ export function QuizPage({ source, profile, query }) {
     setBusy(true);
     setAnswer(ans);
     const correct = checkAnswer(q, ans);
+    cancelDraft();
+    liveReport(profile, { answered: true, correct, draft: q._map ? q._map[ans - 1] + 1 : ans });
     let xp = 0;
     try {
       const stored = q._map ? q._map[ans - 1] + 1 : ans;   // 섞인 보기 번호 → 원래 번호로 저장
@@ -352,6 +366,7 @@ export function QuizPage({ source, profile, query }) {
 
   const finishQuiz = async () => {
     setOffer(false);
+    liveReport(profile, { page: 'done', question_id: null, draft: null, answered: false, correct: null });
     const graded = results.filter((r) => r.correct !== null && !r.q._bonus);
     const right = graded.filter((r) => r.correct).length;
     let bonus = null;
@@ -421,6 +436,7 @@ export function QuizPage({ source, profile, query }) {
   return html`<div class="page quiz">
     <div class="quiz-top">
       <a class="back" href=${meta.backHref}>← ${meta.title}</a>
+      ${watching && html`<span class="watch-badge" title="선생님 화면에 내가 푸는 문제가 보여요">👀 선생님이 함께 보고 있어요</span>`}
       ${ttsSupported && html`<label class="toggle"><input type="checkbox" checked=${auto} onChange=${(e) => { setAuto(e.target.checked); setAutoRead(e.target.checked); }} /> 자동 읽기</label>`}
     </div>
     <div class="dots">${Array.from({ length: total }, (_, i) => {
@@ -431,7 +447,7 @@ export function QuizPage({ source, profile, query }) {
     <div class="card question" key=${q.id + round}>
       <div class="q-meta">${q._bonus && html`<span class="pill bonus">🌟 보너스 도전</span>`}<span class="pill">${TYPES[q.type].icon} ${TYPES[q.type].label}</span><span class=${'pill d' + q.difficulty}>${DIFFICULTY[q.difficulty]}</span><span class="muted">${idx + 1} / ${total}</span></div>
       <div class="q-prompt"><${RichText} text=${q.prompt} /> <${SpeakBtn} text=${q.prompt} /></div>
-      <${View} q=${q} done=${done} answer=${answer} onAnswer=${submit} />
+      <${View} q=${q} done=${done} answer=${answer} onAnswer=${submit} onDraft=${(d) => liveDraft(profile, d)} />
     </div>
 
     ${done && html`<div class=${'feedback card ' + (result.correct === true ? 'good' : result.correct === false ? 'bad' : 'essay')}>

@@ -1,10 +1,10 @@
 // 📡 실시간 현황: 학생들이 지금 무엇을 하고 있는지 바로바로 보여요
 // Supabase 실시간 연결을 쓰고, 연결이 안 되면 20초마다 새로 불러와요
 import { html, useState, useEffect, useRef } from '../../vendor/preact-htm.js';
-import { sb, friendlyError } from '../lib/sb.js';
+import { sb, rpc, friendlyError } from '../lib/sb.js';
 import { TYPES, DIFFICULTY, tierOf } from '../lib/questions.js';
 import { answerToText, todayKst } from '../lib/report.js';
-import { Loading, ErrorBox, timeAgo } from '../components/ui.js';
+import { Loading, ErrorBox, timeAgo, toast } from '../components/ui.js';
 import { AvatarImg } from '../components/avatar-ui.js';
 import { RichText } from '../components/math.js';
 
@@ -13,6 +13,95 @@ const EVENT_TEXT = {
   buy: '🛍️ 상점에서 샀어요', essay_graded: '🌟 서술형 채점 받음', teacher_coins: '🎁 칭찬/약속', teacher_praise: '🎁 칭찬 받음', teacher_dice: '🎲 주사위 선물',
 };
 const MODE = { quiz: '퀴즈', set: '묶음 퀴즈', retry: '다시 풀기', game: '모험', bonus: '🌟 보너스 도전' };
+
+// ---------- 👀 지켜보기: 학생 화면 그대로 ----------
+const PAGE_TEXT = { quiz: '📝 퀴즈 푸는 중', lesson: '📖 복습 자료 보는 중', game: '🎲 모험 지도', done: '🏁 퀴즈를 마쳤어요', away: '💤 퀴즈에서 나갔어요' };
+const hhmm = (t) => new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+const minutesToMidnight = () => { const now = new Date(); const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' })); return Math.max(10, 24 * 60 - kst.getHours() * 60 - kst.getMinutes() - 1); };
+
+function WatchPanel({ students, showTest }) {
+  const [watch, setWatch] = useState(null);
+  const [rows, setRows] = useState({});
+  const [drafts, setDrafts] = useState(true);
+  const [conn, setConn] = useState('connecting');
+  const qCache = useRef({});
+  const [, bump] = useState(0);
+
+  const withQ = async (list) => {
+    const need = [...new Set(list.filter((r) => r.question_id && !qCache.current[r.question_id]).map((r) => r.question_id))];
+    if (need.length) {
+      const { data } = await sb.from('questions').select('id,type,difficulty,tier,prompt,data').in('id', need);
+      (data || []).forEach((q) => { qCache.current[q.id] = q; });
+    }
+  };
+  const load = async () => {
+    const [w, l] = await Promise.all([rpc('live_watch'), sb.from('live_status').select('*')]);
+    setWatch(w); if (w?.on) setDrafts(!!w.drafts);
+    if (!l.error) { await withQ(l.data); setRows(Object.fromEntries(l.data.map((r) => [r.user_id, r]))); }
+  };
+
+  useEffect(() => {
+    load().catch(() => setWatch({ on: false, missing: true }));
+    let poll = null;
+    const ch = sb.channel('teacher-watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_status' }, async (m) => {
+        const r = m.new; if (!r?.user_id) return;
+        await withQ([r]);
+        setRows((x) => ({ ...x, [r.user_id]: { ...(x[r.user_id] || {}), ...r, _flash: Date.now() } }));
+      })
+      .subscribe((st) => {
+        if (st === 'SUBSCRIBED') { setConn('on'); if (poll) { clearInterval(poll); poll = null; } }
+        else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(st) && !poll) { setConn('poll'); poll = setInterval(() => load().catch(() => {}), 5000); }
+      });
+    const fb = setTimeout(() => setConn((c) => { if (c === 'connecting' && !poll) { poll = setInterval(() => load().catch(() => {}), 5000); return 'poll'; } return c; }), 8000);
+    const clock = setInterval(() => bump((n) => n + 1), 15000);
+    return () => { sb.removeChannel(ch); if (poll) clearInterval(poll); clearTimeout(fb); clearInterval(clock); };
+  }, []);
+
+  const set = async (minutes, d = drafts) => {
+    try { const w = await rpc('set_live_watch', { p_minutes: minutes, p_drafts: d }); setWatch(w); toast(minutes ? '👀 지켜보기를 켰어요. 학생이 퀴즈를 새로 열면 보여요' : '지켜보기를 껐어요'); }
+    catch (e) { toast('⚠️ ' + friendlyError(e)); }
+  };
+  const left = watch?.on ? Math.max(1, Math.round((new Date(watch.until) - Date.now()) / 60000)) : 0;
+
+  if (!watch) return html`<div class="card watch-panel"><p class="muted">불러오는 중…</p></div>`;
+  if (watch.missing) return html`<div class="card watch-panel"><p class="muted">👀 지켜보기를 쓰려면 Supabase 업데이트 11이 필요해요.</p></div>`;
+
+  const shown = students.filter((s) => showTest || !s.is_test);
+  const now = Date.now();
+  return html`<div class=${'card watch-panel' + (watch.on ? ' on' : '')}>
+    <div class="watch-head">
+      <div><h2>👀 지켜보기 ${watch.on ? html`<span class="live-badge on">켜짐 · ${hhmm(watch.until)}까지</span>` : html`<span class="live-badge">꺼짐</span>`}</h2>
+        <p class="muted small">켜 두면 학생이 지금 푸는 문제와 ${drafts ? '입력 중인 답까지' : '고른 답이'} 바로 보여요. 학생 퀴즈 화면에는 "👀 선생님이 함께 보고 있어요"가 표시돼요.</p></div>
+      <div class="watch-ctrl">
+        <label class="check small"><input type="checkbox" checked=${drafts} onChange=${(e) => { setDrafts(e.target.checked); if (watch.on) set(left, e.target.checked); }} /> ✏️ 입력 중인 답까지 보기</label>
+        <div class="btn-row">
+          ${!watch.on ? html`<button class="btn primary" onClick=${() => set(60)}>▶ 1시간 켜기</button><button class="btn" onClick=${() => set(120)}>2시간</button><button class="btn" onClick=${() => set(minutesToMidnight())}>오늘 끝까지</button>`
+            : html`<button class="btn" onClick=${() => set(left + 30)}>+30분</button><button class="btn warn" onClick=${() => set(0)}>■ 끄기</button>`}
+        </div>
+      </div>
+    </div>
+    ${watch.on && html`<div class="screen-grid">${shown.map((s) => {
+      const r = rows[s.id];
+      const fresh = r && now - new Date(r.updated_at).getTime() < 10 * 60000;
+      const q = r?.question_id ? qCache.current[r.question_id] : null;
+      const page = fresh ? r.page : null;
+      const flash = r?._flash && now - r._flash < 2500;
+      return html`<div class=${'screen-card' + (page === 'quiz' ? ' active' : '') + (flash ? ' flash' : '') + (!page ? ' idle' : '')} key=${s.id}>
+        <div class="sc-top"><${AvatarImg} cfg=${s.avatar_cfg} size=${36} /><b>${s.display_name || s.login_id}</b> <span class=${'tier-badge sm t-' + tierOf(s)}>${tierOf(s)}</span>
+          <span class="muted small sc-time">${r ? timeAgo(r.updated_at) : ''}</span></div>
+        <div class="sc-page">${page ? PAGE_TEXT[page] || page : '— 아직 들어오지 않았어요'}${page === 'quiz' && r.q_index ? html` <b>${r.q_index}/${r.q_total}</b>` : ''}${fresh && r.title ? html` <span class="muted small">· ${r.title}</span>` : ''}</div>
+        ${page === 'quiz' && q && html`<div class="sc-q"><span class="muted small">${TYPES[q.type]?.icon} ${DIFFICULTY[q.difficulty] || ''}${q.tier ? ' · ' + q.tier : ''}</span> <${RichText} text=${q.prompt.length > 90 ? q.prompt.slice(0, 90) + '…' : q.prompt} /></div>`}
+        ${page === 'quiz' && (r.answered
+          ? html`<div class=${'sc-ans ' + (q?.type === 'essay' || r.correct === null ? 'essay' : r.correct ? 'ok' : 'no')}>${q?.type === 'essay' || r.correct === null ? '✍️ 제출' : r.correct ? '✅ 정답' : '❌ 오답'} · <${RichText} text=${answerToText(q, r.draft).slice(0, 160)} /></div>`
+          : r.draft != null && r.draft !== '' ? html`<div class="sc-ans typing">✏️ <${RichText} text=${answerToText(q, r.draft).slice(0, 160)} /><span class="dots3"><i></i><i></i><i></i></span></div>`
+          : html`<div class="sc-ans wait muted">생각하는 중…</div>`)}
+        ${fresh && r.lesson_id && html`<a class="small" href=${'#/t/stats/' + r.lesson_id}>📊 이 수업 문항 통계 →</a>`}
+      </div>`;
+    })}</div>
+    <p class="muted small">${conn === 'on' ? '● 실시간 연결됨' : conn === 'poll' ? '⟳ 5초마다 새로 고침' : '… 연결 중'} · 10분 넘게 움직임이 없으면 흐리게 보여요</p>`}
+  </div>`;
+}
 
 export function LiveDashboard() {
   const [students, setStudents] = useState(null);
@@ -109,6 +198,8 @@ export function LiveDashboard() {
         <label class="check small"><input type="checkbox" checked=${showTest} onChange=${(e) => setShowTest(e.target.checked)} /> 🧪 테스트 계정도 보기</label>
       </div>
     </div>
+    <${WatchPanel} students=${students} showTest=${showTest} />
+    <div class="btn-row"><a class="btn small" href="#/t/stats">📊 수업별 문항 통계 보기</a></div>
     <p class="muted small">지금 공부 중 <b>${activeNow}</b>명 · 오늘 푼 문제 <b>${rows.filter((r) => r._t === 'a').length}</b>개 · 학생이 문제를 풀면 아래에 바로 나타나요.</p>
 
     <div class="live-grid">${ranked.map(({ s, st }) => html`<a class=${'card live-card' + (st.mins < 5 ? ' now' : st.mins < 30 ? ' recent' : '')} href=${'#/t/report/' + s.id}>
