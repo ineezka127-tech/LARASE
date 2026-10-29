@@ -181,7 +181,7 @@ export function reportMarkdown(r) {
   L.push('');
   L.push(`- 기간: ${r.from} ~ ${r.to}`);
   L.push(`- 학년: ${s.grade ? s.grade + '학년' : '-'} · 그룹: ${TIER_INFO[r.tier].name} (${TIER_INFO[r.tier].level})`);
-  L.push(`- 만든 날: ${todayKst()} · 자료: 복습 교실 풀이 기록 (자동 채점 문제 기준, 서술형은 선생님 채점)`);
+  L.push(`- 만든 날: ${todayKst()} · 자료: 인쌤의 배움 놀이터 풀이 기록 (자동 채점 문제 기준, 서술형은 선생님 채점)`);
   L.push('');
   L.push('## 1. 한눈에 보기');
   L.push('');

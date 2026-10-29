@@ -46,9 +46,9 @@ export function LoginPage({ appName }) {
 
   return html`<div class="login-wrap">
     <form class="card login" onSubmit=${submit}>
-      <div class="login-logo">${APP_MODE === 'teacher' ? '🧑‍🏫' : '📚'}</div>
+      <div class="login-logo">${APP_MODE === 'teacher' ? '🧑‍🏫' : '🎈'}</div>
       <h1>${appName}${APP_MODE === 'teacher' ? html` <span class="mode-tag">선생님</span>` : ''}</h1>
-      <p class="muted">${APP_MODE === 'teacher' ? '수업 자료·학생 현황·채점을 관리해요' : '오늘 배운 것, 다시 한번 해 볼까요?'}</p>
+      <p class="muted">${APP_MODE === 'teacher' ? '수업 자료·학생 현황·채점을 관리해요' : '배우고, 놀고, 쓰면서 쑥쑥 자라요!'}</p>
       ${recent.length > 0 && html`<div class="chips">${recent.map((r) => html`
         <button type="button" class=${'chip' + (r === id ? ' on' : '')} onClick=${() => setId(r)}>${r}</button>`)}</div>`}
       <label>아이디<input class="input big" value=${id} onInput=${(e) => setId(e.target.value)} autocomplete="username" placeholder="예: 특수1" /></label>
