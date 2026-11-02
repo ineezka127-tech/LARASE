@@ -18,7 +18,7 @@ export async function liveReport(profile, patch) {
   const w = await liveWatch();
   if (!w.on) return;
   const row = { user_id: profile.id, ...patch, updated_at: new Date().toISOString() };
-  if (!w.drafts && !patch.answered && 'draft' in row) delete row.draft;   // 입력 중인 답은 선생님이 허락했을 때만
+  if (!w.drafts && !patch.answered && 'draft' in row && !row.draft?.sid) delete row.draft;   // 입력 중인 답은 선생님이 허락했을 때만 (글쓰기는 글 번호만 보내요)
   try { await sb.from('live_status').upsert(row); } catch {}
 }
 

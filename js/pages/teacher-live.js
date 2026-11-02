@@ -7,6 +7,7 @@ import { answerToText, todayKst } from '../lib/report.js';
 import { Loading, ErrorBox, timeAgo, toast } from '../components/ui.js';
 import { AvatarImg } from '../components/avatar-ui.js';
 import { RichText } from '../components/math.js';
+import { WriteMini } from './teacher-writing.js';
 
 const EVENT_TEXT = {
   view: '📖 복습 자료를 봤어요', quiz_done: '🏁 퀴즈를 끝까지 풀었어요', daily: '🔥 오늘 첫 접속', levelup: '⭐ 레벨 업!',
@@ -15,7 +16,7 @@ const EVENT_TEXT = {
 const MODE = { quiz: '퀴즈', set: '묶음 퀴즈', retry: '다시 풀기', game: '모험', bonus: '🌟 보너스 도전' };
 
 // ---------- 👀 지켜보기: 학생 화면 그대로 ----------
-const PAGE_TEXT = { quiz: '📝 퀴즈 푸는 중', lesson: '📖 복습 자료 보는 중', game: '🎲 모험 지도', done: '🏁 퀴즈를 마쳤어요', away: '💤 퀴즈에서 나갔어요' };
+const PAGE_TEXT = { quiz: '📝 퀴즈 푸는 중', lesson: '📖 복습 자료 보는 중', game: '🎲 모험 지도', done: '🏁 퀴즈를 마쳤어요', away: '💤 화면에서 나갔어요', write: '✍️ 글쓰기 중', wsent: '📮 글을 냈어요' };
 const hhmm = (t) => new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 const minutesToMidnight = () => { const now = new Date(); const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' })); return Math.max(10, 24 * 60 - kst.getHours() * 60 - kst.getMinutes() - 1); };
 
@@ -25,7 +26,15 @@ function WatchPanel({ students, showTest }) {
   const [drafts, setDrafts] = useState(true);
   const [conn, setConn] = useState('connecting');
   const qCache = useRef({});
+  const [w5, setW5] = useState({});      // 글쓰기 중인 글 (id → 글)
   const [, bump] = useState(0);
+
+  const withW5 = async (list) => {
+    const ids = [...new Set(list.map((r) => r.draft?.sid).filter(Boolean))];
+    if (!ids.length) return;
+    const { data } = await sb.from('w5_submissions').select('*').in('id', ids);
+    if (data?.length) setW5((m) => ({ ...m, ...Object.fromEntries(data.map((x) => [x.id, x])) }));
+  };
 
   const withQ = async (list) => {
     const need = [...new Set(list.filter((r) => r.question_id && !qCache.current[r.question_id]).map((r) => r.question_id))];
@@ -37,7 +46,7 @@ function WatchPanel({ students, showTest }) {
   const load = async () => {
     const [w, l] = await Promise.all([rpc('live_watch'), sb.from('live_status').select('*')]);
     setWatch(w); if (w?.on) setDrafts(!!w.drafts);
-    if (!l.error) { await withQ(l.data); setRows(Object.fromEntries(l.data.map((r) => [r.user_id, r]))); }
+    if (!l.error) { await withQ(l.data); withW5(l.data); setRows(Object.fromEntries(l.data.map((r) => [r.user_id, r]))); }
   };
 
   useEffect(() => {
@@ -47,7 +56,13 @@ function WatchPanel({ students, showTest }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_status' }, async (m) => {
         const r = m.new; if (!r?.user_id) return;
         await withQ([r]);
+        if (r.draft?.sid) withW5([r]);
         setRows((x) => ({ ...x, [r.user_id]: { ...(x[r.user_id] || {}), ...r, _flash: Date.now() } }));
+      })
+      // 글쓰기: 학생이 쓰는 글자가 바로 보여요
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'w5_submissions' }, (m) => {
+        const r = m.new; if (!r?.id) return;
+        setW5((x) => (x[r.id] ? { ...x, [r.id]: r } : x));
       })
       .subscribe((st) => {
         if (st === 'SUBSCRIBED') { setConn('on'); if (poll) { clearInterval(poll); poll = null; } }
@@ -72,7 +87,7 @@ function WatchPanel({ students, showTest }) {
   return html`<div class=${'card watch-panel' + (watch.on ? ' on' : '')}>
     <div class="watch-head">
       <div><h2>👀 지켜보기 ${watch.on ? html`<span class="live-badge on">켜짐 · ${hhmm(watch.until)}까지</span>` : html`<span class="live-badge">꺼짐</span>`}</h2>
-        <p class="muted small">켜 두면 학생이 지금 푸는 문제와 ${drafts ? '입력 중인 답까지' : '고른 답이'} 바로 보여요. 학생 퀴즈 화면에는 "👀 선생님이 함께 보고 있어요"가 표시돼요.</p></div>
+        <p class="muted small">켜 두면 학생이 지금 푸는 문제와 ${drafts ? '입력 중인 답까지' : '고른 답이'} 바로 보여요. ✍️ 글쓰기 중인 학생은 쓰고 있는 여섯 칸이 보이고, 여기서 바로 한마디를 보낼 수 있어요. 학생 퀴즈 화면에는 "👀 선생님이 함께 보고 있어요"가 표시돼요.</p></div>
       <div class="watch-ctrl">
         <label class="check small"><input type="checkbox" checked=${drafts} onChange=${(e) => { setDrafts(e.target.checked); if (watch.on) set(left, e.target.checked); }} /> ✏️ 입력 중인 답까지 보기</label>
         <div class="btn-row">
@@ -87,15 +102,17 @@ function WatchPanel({ students, showTest }) {
       const q = r?.question_id ? qCache.current[r.question_id] : null;
       const page = fresh ? r.page : null;
       const flash = r?._flash && now - r._flash < 2500;
-      return html`<div class=${'screen-card' + (page === 'quiz' ? ' active' : '') + (flash ? ' flash' : '') + (!page ? ' idle' : '')} key=${s.id}>
+      const writing = page === 'write' || page === 'wsent';
+      return html`<div class=${'screen-card' + (page === 'quiz' || writing ? ' active' : '') + (writing ? ' write' : '') + (flash ? ' flash' : '') + (!page ? ' idle' : '')} key=${s.id}>
         <div class="sc-top"><${AvatarImg} cfg=${s.avatar_cfg} size=${36} /><b>${s.display_name || s.login_id}</b> <span class=${'tier-badge sm t-' + tierOf(s)}>${tierOf(s)}</span>
           <span class="muted small sc-time">${r ? timeAgo(r.updated_at) : ''}</span></div>
-        <div class="sc-page">${page ? PAGE_TEXT[page] || page : '— 아직 들어오지 않았어요'}${page === 'quiz' && r.q_index ? html` <b>${r.q_index}/${r.q_total}</b>` : ''}${fresh && r.title ? html` <span class="muted small">· ${r.title}</span>` : ''}</div>
+        <div class="sc-page">${page ? PAGE_TEXT[page] || page : '— 아직 들어오지 않았어요'}${page === 'quiz' && r.q_index ? html` <b>${r.q_index}/${r.q_total}</b>` : ''}${page === 'write' && r.q_total ? html` <b>${r.q_index}/${r.q_total}칸</b>` : ''}${fresh && r.title ? html` <span class="muted small">· ${r.title}</span>` : ''}</div>
         ${page === 'quiz' && q && html`<div class="sc-q"><span class="muted small">${TYPES[q.type]?.icon} ${DIFFICULTY[q.difficulty] || ''}${q.tier ? ' · ' + q.tier : ''}</span> <${RichText} text=${q.prompt.length > 90 ? q.prompt.slice(0, 90) + '…' : q.prompt} /></div>`}
         ${page === 'quiz' && (r.answered
           ? html`<div class=${'sc-ans ' + (q?.type === 'essay' || r.correct === null ? 'essay' : r.correct ? 'ok' : 'no')}>${q?.type === 'essay' || r.correct === null ? '✍️ 제출' : r.correct ? '✅ 정답' : '❌ 오답'} · <${RichText} text=${answerToText(q, r.draft).slice(0, 160)} /></div>`
           : r.draft != null && r.draft !== '' ? html`<div class="sc-ans typing">✏️ <${RichText} text=${answerToText(q, r.draft).slice(0, 160)} /><span class="dots3"><i></i><i></i><i></i></span></div>`
           : html`<div class="sc-ans wait muted">생각하는 중…</div>`)}
+        ${writing && html`<${WriteMini} x=${w5[r.draft?.sid]} onSaved=${(x) => setW5((m) => ({ ...m, [x.id]: x }))} />`}
         ${fresh && r.lesson_id && html`<a class="small" href=${'#/t/stats/' + r.lesson_id}>📊 이 수업 문항 통계 →</a>`}
       </div>`;
     })}</div>

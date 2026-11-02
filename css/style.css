@@ -1142,3 +1142,57 @@ h2.mt { margin-top: 18px; }
 /* 이름이 길어져서: 좁은 화면에서는 로고만 */
 @media (max-width: 1400px) { .app.teacher .brand span:not(.mode-tag) { display: none; } }
 @media (max-width: 1150px) { .app.student .brand span { display: none; } }
+
+/* ---------- v13: 글쓰기 지켜보기 · 수업 화면 · 우리 반 글 ---------- */
+.fb-bar { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.fb-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.fb-chips .chip { padding: 3px 10px; font-size: 0.82em; }
+.fb-bar.compact .fb-chips { max-height: 2.1em; overflow: hidden; }
+.fb-bar.compact .fb-chips:hover, .fb-bar.compact:focus-within .fb-chips { max-height: none; }
+.fb-bar.compact .w5t-actions .input { min-width: 0; flex: 1 1 100%; }
+.fb-bar.big .fb-chips .chip { font-size: 1em; padding: 6px 14px; }
+.fb-bar.big .w5t-actions .input { font-size: 1.15em; padding: 12px 14px; flex: 1 1 320px; }
+.t-feedback.fresh { animation: pop 0.5s ease-out; box-shadow: 0 0 0 4px rgba(250, 176, 5, 0.35); }
+.t-feedback.small { font-size: 0.88em; padding: 6px 10px; }
+
+@media (min-width: 900px) { .screen-card.write { grid-column: span 2; } }
+.w5-mini-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 0.9em; }
+.wm-row { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.wm-row.empty .wm-val { color: var(--muted); }
+.wm-label { flex: none; font-weight: 700; color: var(--muted); font-size: 0.85em; }
+.wm-val { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+.wshow-ctrl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.65em; }
+.wshow-ctrl select.input { width: auto; }
+.wshow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 16px; align-content: start; }
+.wshow-tile { text-align: left; font: inherit; color: inherit; background: #fff; border: 2px solid transparent; border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); transition: transform 0.15s, box-shadow 0.3s; }
+.wshow-tile:hover { transform: translateY(-2px); }
+.wshow-tile.star { border-color: #fcc419; }
+.wshow-tile.flash { box-shadow: 0 0 0 5px rgba(250, 176, 5, 0.45); }
+.wshow-tile.warn { border-left: 6px solid #fab005; }
+.wshow-tile.good { border-left: 6px solid #40c057; }
+.wshow-tile.redo { border-left: 6px solid #ff922b; }
+.wt-head { display: flex; align-items: center; gap: 8px; font-size: 1.15em; }
+.wt-text { font-size: 1.3em; font-weight: 700; line-height: 1.5; word-break: keep-all; }
+.wt-fields { display: flex; flex-wrap: wrap; gap: 4px; }
+.wt-fields span { background: #f1f3f5; border-radius: 10px; padding: 3px 8px; font-weight: 600; }
+.wt-fields small { color: var(--muted); }
+.wshow-focus { position: fixed; inset: 0; background: rgba(20, 22, 40, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; overflow: auto; }
+.wshow-card.focus { margin: 0; max-height: calc(100vh - 32px); overflow: auto; padding: 24px 32px; }
+.wf-top { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.wf-top .wshow-task { flex: 1; }
+.wshow-card.focus .wshow-author { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
+.wshow-card.focus .wshow-text { font-size: 2.2em; margin: 12px 0; }
+.wshow-fields span.pass { background: #ebfbee; }
+.wshow-fields span.fail { background: #fff4e6; }
+.wshow-fields span.empty { opacity: 0.5; }
+.wshow-card.focus .fb-bar { margin-top: 18px; text-align: left; }
+.wshow-card.focus .t-feedback { margin-top: 14px; text-align: left; }
+@media (max-width: 700px) { .wshow { padding: 12px 16px; } .wshow-card.focus { padding: 16px; } .wshow-card.focus .wshow-text { font-size: 1.5em; } }
+
+.strip-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.board-card { display: flex; flex-direction: column; gap: 8px; }
+.board-card.mine { border: 2px solid #fcc419; }
+.bc-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.bc-text { font-size: 1.25em; font-weight: 700; line-height: 1.6; word-break: keep-all; }

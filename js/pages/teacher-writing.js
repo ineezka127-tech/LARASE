@@ -1,9 +1,10 @@
 // ✍️ 육하원칙 글쓰기 (선생님): 실시간 학생 글 · 피드백 · 다시 써 보기 · 모두에게 보여주기 · 주제 · 맞춤법 · 학생별 기준
-import { html, useState, useEffect } from '../../vendor/preact-htm.js';
+import { html, useState, useEffect, useRef } from '../../vendor/preact-htm.js';
 import { sb, friendlyError } from '../lib/sb.js';
 import { tierOf } from '../lib/questions.js';
 import { FIELDS, FIELD, ALL_KEYS, defaultRule, exampleSentence } from '../lib/w5.js';
-import { Loading, ErrorBox, toast, timeAgo, go } from '../components/ui.js';
+import { Loading, ErrorBox, SpeakBtn, toast, timeAgo, go } from '../components/ui.js';
+import { PraiseModal } from '../components/praise.js';
 import { AvatarImg } from '../components/avatar-ui.js';
 import { kstDate, todayKst } from '../lib/report.js';
 
@@ -14,7 +15,7 @@ export function TeacherWriting() {
   const [tab, setTab] = useState('subs');
   return html`<div class="page">
     <div class="page-head"><h1>✍️ 육하원칙 글쓰기</h1>
-      <a class="btn primary" href="#/wshow">📺 모두에게 보여주기 화면</a></div>
+      <a class="btn primary" href="#/wshow">📺 수업 화면 (모두 함께 보기)</a></div>
     <div class="tabs">${TABS.map(([k, l]) => html`<button class=${'tab' + (tab === k ? ' on' : '')} onClick=${() => setTab(k)}>${l}</button>`)}</div>
     ${tab === 'subs' && html`<${Submissions} />`}
     ${tab === 'tasks' && html`<${Tasks} />`}
@@ -79,18 +80,20 @@ function Submissions() {
   </div>`;
 }
 
-function SubCard({ x, student, task, flash, onSaved }) {
+// 자주 쓰는 한마디 (누르면 입력 칸에 들어가요. 고쳐서 보내도 돼요)
+export const QUICK_FEEDBACK = ['👏 여섯 칸을 모두 잘 썼어요!', '🌟 문장이 아주 자연스러워요!', '💡 왜 그랬는지 더 자세히 써 볼까요?', '💡 언제인지 더 정확하게 써 볼까요?', '💡 어떻게 했는지 더 써 볼까요?', '🔤 맞춤법을 한 번 더 살펴봐요'];
+
+// 💬 한마디·다시 써 보기·완료·모두에게 보여주기 (학생 글 카드, 지켜보기, 수업 화면에서 함께 써요)
+export function FeedbackBar({ x, onSaved, compact = false, big = false, extra = null }) {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
-  const c = x.checks || {};
-  const required = c.required || ALL_KEYS;
-  const [label, cls] = STATUS[x.status];
+  const inputRef = useRef(null);
   const update = async (patch, note) => {
     setBusy(true);
     const { data, error } = await sb.from('w5_submissions').update(patch).eq('id', x.id).select('*').single();
     setBusy(false);
     if (error) { toast('⚠️ ' + friendlyError(error)); return; }
-    onSaved(data); if (note) toast(note); setMsg('');
+    onSaved?.(data); if (note) toast(note); setMsg('');
   };
   const send = (status) => {
     const text = msg.trim();
@@ -98,6 +101,24 @@ function SubCard({ x, student, task, flash, onSaved }) {
     update({ teacher_feedback: text || x.teacher_feedback || (status === 'redo' ? '한 번 더 고쳐 볼까요?' : null), feedback_at: new Date().toISOString(), ...(status ? { status } : {}) },
       status === 'redo' ? '🔁 다시 써 보기를 보냈어요' : status === 'done' ? '👍 완료로 표시했어요' : '💬 보냈어요');
   };
+  const sz = big ? '' : ' small';
+  return html`<div class=${'fb-bar' + (compact ? ' compact' : '') + (big ? ' big' : '')}>
+    <div class="fb-chips">${QUICK_FEEDBACK.map((t) => html`<button type="button" class="chip" onClick=${() => { setMsg(t); inputRef.current?.focus(); }}>${t}</button>`)}</div>
+    <div class="w5t-actions">
+      <input ref=${inputRef} class="input" maxlength="300" value=${msg} placeholder="학생에게 한마디 (Enter로 보내기)" onInput=${(e) => setMsg(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && msg.trim() && send(null)} />
+      <button class=${'btn primary' + sz} disabled=${busy || !msg.trim()} onClick=${() => send(null)}>💬 보내기</button>
+      <button class=${'btn warn' + sz} disabled=${busy} onClick=${() => send('redo')}>🔁 다시 써 보기</button>
+      ${x.status !== 'writing' && html`<button class=${'btn good' + sz} disabled=${busy || x.status === 'done'} onClick=${() => send('done')}>👍 완료</button>`}
+      <button class=${'btn' + sz + (x.showcase ? ' on-star' : '')} disabled=${busy} onClick=${() => update({ showcase: !x.showcase }, x.showcase ? '보여주기를 내렸어요' : '⭐ 학생들도 볼 수 있게 했어요')}>${x.showcase ? '⭐ 내리기' : '⭐ 모두에게 보여주기'}</button>
+      ${extra}
+    </div>
+  </div>`;
+}
+
+function SubCard({ x, student, task, flash, onSaved }) {
+  const c = x.checks || {};
+  const required = c.required || ALL_KEYS;
+  const [label, cls] = STATUS[x.status];
   const spellFlags = [...(c.spelling || []), ...(c.finalSpelling || []).map((s) => ({ ...s, field: 'final' }))];
   return html`<div class=${'card w5t-card ' + cls + (flash ? ' flash' : '')}>
     <div class="w5t-head"><${AvatarImg} cfg=${student.avatar_cfg} size=${40} /><b>${student.display_name || student.login_id}</b>
@@ -116,14 +137,25 @@ function SubCard({ x, student, task, flash, onSaved }) {
     ${spellFlags.length > 0 && html`<div class="small w5t-spell">🔤 ${spellFlags.map((s) => html`<span class=${'pill ' + (s.sure ? 'warn' : '')}>${s.wrong} → ${s.right}${s.sure ? '' : '?'}</span>`)}</div>`}
     ${(x.final_text || x.status !== 'writing') && html`<div class="final-box small-final">${x.final_text ? `“${x.final_text}”` : html`<span class="muted">(예시) ${exampleSentence(x.fields || {})}</span>`}</div>`}
     ${x.teacher_feedback && html`<div class="t-feedback">💬 보낸 한마디: ${x.teacher_feedback}</div>`}
-    <div class="w5t-actions">
-      <input class="input" maxlength="300" value=${msg} placeholder="학생에게 한마디 (예: '왜' 칸 정말 잘 썼어요!)" onInput=${(e) => setMsg(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && msg.trim() && send(null)} />
-      <button class="btn small primary" disabled=${busy || !msg.trim()} onClick=${() => send(null)}>💬 보내기</button>
-      <button class="btn small warn" disabled=${busy} onClick=${() => send('redo')}>🔁 다시 써 보기</button>
-      <button class="btn small good" disabled=${busy || x.status === 'done'} onClick=${() => send('done')}>👍 완료</button>
-      <button class="btn small ghost" title="이 글 지우기" disabled=${busy} onClick=${async () => { if (!confirm('이 글을 지울까요?')) return; const { error } = await sb.from('w5_submissions').delete().eq('id', x.id); if (error) toast('⚠️ ' + friendlyError(error)); else onSaved({ ...x, _deleted: true }); }}>🗑️</button>
-      <button class=${'btn small' + (x.showcase ? ' on-star' : '')} disabled=${busy} onClick=${() => update({ showcase: !x.showcase }, x.showcase ? '보여주기를 내렸어요' : '⭐ 모두에게 보여줘요')}>${x.showcase ? '⭐ 내리기' : '⭐ 모두에게 보여주기'}</button>
-    </div>
+    <${FeedbackBar} x=${x} onSaved=${onSaved}
+      extra=${html`<button class="btn small ghost" title="이 글 지우기" onClick=${async () => { if (!confirm('이 글을 지울까요?')) return; const { error } = await sb.from('w5_submissions').delete().eq('id', x.id); if (error) toast('⚠️ ' + friendlyError(error)); else onSaved({ ...x, _deleted: true }); }}>🗑️</button>`} />
+  </div>`;
+}
+
+// 지켜보기 화면에 들어가는 작은 글 카드 (칸별 내용 + 한마디)
+export function WriteMini({ x, onSaved }) {
+  if (!x) return html`<div class="sc-ans wait muted">글을 막 시작했어요. 한 칸을 쓰면 여기에 보여요…</div>`;
+  const c = x.checks || {};
+  const required = c.required || ALL_KEYS;
+  return html`<div class="w5-mini">
+    <div class="w5-mini-fields">${FIELDS.map((f) => {
+      const v = x.fields?.[f.k];
+      const mark = !required.includes(f.k) ? '' : c.passed ? (c.passed[f.k] ? '✅' : '❌') : '';
+      return html`<div class=${'wm-row' + (v ? '' : ' empty')}><span class="wm-label">${f.icon} ${f.label}</span><span class="wm-val">${v || '—'}</span><span>${mark}</span></div>`;
+    })}</div>
+    ${x.final_text && html`<div class="final-box small-final">“${x.final_text}”</div>`}
+    ${x.teacher_feedback && html`<div class="t-feedback small">💬 ${x.teacher_feedback}</div>`}
+    <${FeedbackBar} x=${x} onSaved=${onSaved} compact />
   </div>`;
 }
 
@@ -211,37 +243,125 @@ function Rules() {
     </table></div>`;
 }
 
-// ---------- 📺 모두에게 보여주기 화면 (TV) ----------
+// ---------- 📺 수업 화면: 우리 반 글을 모두 함께 보고 바로 한마디 ----------
+// 교실 TV(전자칠판)에 띄워 놓고, 글을 눌러 크게 보면서 바로 피드백·칭찬해요. 학생이 쓰는 대로 실시간으로 바뀌어요.
 export function WritingShow() {
-  const [list, setList] = useState(null);
-  const [idx, setIdx] = useState(0);
-  const [tasks, setTasks] = useState({});
-  const load = async () => {
-    const [s, t] = await Promise.all([
-      sb.from('w5_submissions').select('*').eq('showcase', true).order('updated_at', { ascending: false }),
-      sb.from('w5_tasks').select('*'),
-    ]);
-    setList(s.data || []); setTasks(Object.fromEntries((t.data || []).map((x) => [x.id, x])));
+  const [d, setD] = useState(null);
+  const [subs, setSubs] = useState([]);
+  const [taskF, setTaskF] = useState(null);      // null = 아직 안 정함 (오늘 가장 최근 주제로)
+  const [today, setToday] = useState(true);
+  const [starOnly, setStarOnly] = useState(false);
+  const [hide, setHide] = useState(false);       // 이름 가리기
+  const [focus, setFocus] = useState(null);      // 크게 보는 글 id
+  const [praise, setPraise] = useState(null);
+  const [conn, setConn] = useState('connecting');
+
+  const loadSubs = async () => {
+    const { data, error } = await sb.from('w5_submissions').select('*').order('created_at', { ascending: true }).limit(400);
+    if (!error) setSubs(data);
   };
   useEffect(() => {
-    load();
-    const ch = sb.channel('w5-show').on('postgres_changes', { event: '*', schema: 'public', table: 'w5_submissions' }, () => load()).subscribe();
-    const poll = setInterval(load, 15000);
-    const key = (e) => { if (e.key === 'ArrowRight') setIdx((i) => i + 1); if (e.key === 'ArrowLeft') setIdx((i) => Math.max(0, i - 1)); if (e.key === 'Escape') go('#/t/write'); };
-    window.addEventListener('keydown', key);
-    return () => { sb.removeChannel(ch); clearInterval(poll); window.removeEventListener('keydown', key); };
+    Promise.all([sb.from('profiles').select('*').eq('role', 'student'), sb.from('w5_tasks').select('*').order('created_at', { ascending: false })])
+      .then(([p, t]) => setD({ byId: Object.fromEntries((p.data || []).map((x) => [x.id, x])), tasks: t.data || [] }));
+    loadSubs();
+    const ch = sb.channel('w5-class')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'w5_submissions' }, (m) => {
+        if (m.eventType === 'DELETE') { setSubs((xs) => xs.filter((x) => x.id !== m.old?.id)); return; }
+        const r = m.new; if (!r?.id) return;
+        setSubs((xs) => (xs.some((x) => x.id === r.id) ? xs.map((x) => (x.id === r.id ? { ...r, _flash: Date.now() } : x)) : [...xs, { ...r, _flash: Date.now() }]));
+      })
+      .subscribe((st) => setConn(st === 'SUBSCRIBED' ? 'on' : ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(st) ? 'poll' : 'connecting'));
+    const poll = setInterval(loadSubs, 15000);   // 실시간이 끊겨도 15초마다
+    return () => { sb.removeChannel(ch); clearInterval(poll); };
   }, []);
-  if (!list) return html`<${Loading} />`;
-  const cur = list.length ? list[idx % list.length] : null;
-  const task = cur && tasks[cur.task_id];
+
+  const day = todayKst();
+  const base = d ? subs.filter((x) => d.byId[x.user_id] && !d.byId[x.user_id].is_test && (!today || kstDate(x.updated_at) === day)) : [];
+  // 처음에는 오늘 가장 최근에 쓴 주제를 골라 둬요
+  const autoTask = base.length ? [...base].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0].task_id || 'free' : 'all';
+  const tf = taskF || autoTask;
+  const list = base.filter((x) => (tf === 'all' || (tf === 'free' ? !x.task_id : x.task_id === tf)) && (!starOnly || x.showcase));
+  const fi = list.findIndex((x) => x.id === focus);
+  const cur = fi >= 0 ? list[fi] : null;
+  const nameOf = (x) => (hide ? `${list.indexOf(x) + 1}번 글` : d.byId[x.user_id]?.display_name || x.author_name || '친구');
+  const saved = (r) => setSubs((xs) => xs.map((y) => (y.id === r.id ? r : y)));
+
+  useEffect(() => {
+    const key = (e) => {
+      if (praise || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;   // 칭찬 창이 열려 있으면 그 창이 먼저
+      if (e.key === 'Escape') { if (focus) setFocus(null); else go('#/t/write'); }
+      if (!cur) return;
+      if (e.key === 'ArrowRight' && fi < list.length - 1) setFocus(list[fi + 1].id);
+      if (e.key === 'ArrowLeft' && fi > 0) setFocus(list[fi - 1].id);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  });
+
+  if (!d) return html`<${Loading} />`;
+  const taskInfo = (x) => d.tasks.find((t) => t.id === x.task_id);
+  const allStar = list.length > 0 && list.every((x) => x.showcase);
+  const bulkStar = async () => {
+    const on = !allStar;
+    if (!confirm(on ? `보이는 글 ${list.length}편을 학생들 태블릿 '📋 우리 반 글'에도 보여줄까요?` : '학생 태블릿에서 모두 내릴까요?')) return;
+    const { error } = await sb.from('w5_submissions').update({ showcase: on }).in('id', list.map((x) => x.id));
+    if (error) toast('⚠️ ' + friendlyError(error)); else { toast(on ? '⭐ 학생 태블릿에도 보여요' : '내렸어요'); loadSubs(); }
+  };
+
   return html`<div class="wshow">
-    <div class="wshow-top"><b>⭐ 우리 반 멋진 글</b><span>${list.length ? `${(idx % list.length) + 1} / ${list.length}` : ''}</span><a class="btn small" href="#/t/write">✕ 나가기</a></div>
-    ${!cur ? html`<div class="wshow-empty">선생님이 "⭐ 모두에게 보여주기"를 누른 글이 여기에 나와요.</div>` : html`<div class="wshow-card">
-      <div class="wshow-task">${task?.emoji || '🌈'} ${task?.title || '자유 주제'}</div>
-      <div class="wshow-text">“${cur.final_text || exampleSentence(cur.fields || {})}”</div>
-      <div class="wshow-author">— ${cur.author_name || '친구'}</div>
-      <div class="wshow-fields">${FIELDS.filter((f) => cur.fields?.[f.k]).map((f) => html`<span><small>${f.icon} ${f.label}</small>${cur.fields[f.k]}</span>`)}</div>
+    <div class="wshow-top">
+      <b>📋 우리 반 글 <small class="muted">${list.length}편</small></b>
+      <div class="wshow-ctrl">
+        <select class="input" value=${tf} onChange=${(e) => setTaskF(e.target.value)}>
+          <option value="all">모든 주제</option>
+          ${d.tasks.map((t) => html`<option value=${t.id}>${t.emoji || '📝'} ${t.title}</option>`)}
+          <option value="free">🌈 자유 주제</option>
+        </select>
+        <div class="seg"><button class=${today ? 'on' : ''} onClick=${() => setToday(true)}>오늘</button><button class=${!today ? 'on' : ''} onClick=${() => setToday(false)}>전체</button></div>
+        <label class="check small"><input type="checkbox" checked=${starOnly} onChange=${(e) => setStarOnly(e.target.checked)} /> ⭐만</label>
+        <label class="check small"><input type="checkbox" checked=${hide} onChange=${(e) => setHide(e.target.checked)} /> 🙈 이름 가리기</label>
+        <button class="btn small" disabled=${!list.length} onClick=${bulkStar}>${allStar ? '📢 학생 태블릿에서 내리기' : '📢 학생 태블릿에도 보여주기'}</button>
+        <span class=${'live-badge ' + conn}>${conn === 'on' ? '● 실시간' : conn === 'poll' ? '⟳ 15초마다' : '…'}</span>
+        <a class="btn small" href="#/t/write">✕ 나가기</a>
+      </div>
+    </div>
+
+    ${!list.length ? html`<div class="wshow-empty">${today ? '오늘 쓴 글이 아직 없어요. 학생이 쓰기 시작하면 바로 나타나요 ✍️' : '쓴 글이 없어요.'}</div>`
+      : html`<div class="wshow-grid">${list.map((x) => {
+        const t = taskInfo(x);
+        const [label, cls] = STATUS[x.status];
+        const filled = FIELDS.filter((f) => String(x.fields?.[f.k] || '').trim());
+        const flash = x._flash && Date.now() - x._flash < 2500;
+        return html`<button type="button" key=${x.id} class=${'wshow-tile ' + cls + (flash ? ' flash' : '') + (x.showcase ? ' star' : '')} onClick=${() => setFocus(x.id)}>
+          <div class="wt-head">${!hide && html`<${AvatarImg} cfg=${d.byId[x.user_id]?.avatar_cfg} size=${40} />`}<b>${nameOf(x)}</b>
+            <span class=${'pill ' + cls}>${label}</span>${x.showcase ? html`<span title="학생 태블릿에도 보여요">⭐</span>` : ''}</div>
+          ${tf === 'all' && html`<div class="muted small">${t?.emoji || '🌈'} ${t?.title || '자유 주제'}</div>`}
+          ${x.final_text ? html`<div class="wt-text">“${x.final_text}”</div>`
+            : html`<div class="wt-fields">${filled.length ? filled.map((f) => html`<span><small>${f.label}</small> ${x.fields[f.k]}</span>`) : html`<span class="muted">✏️ 쓰기 시작했어요…</span>`}</div>`}
+          ${x.teacher_feedback && html`<div class="t-feedback small">💬 ${x.teacher_feedback}</div>`}
+        </button>`;
+      })}</div>`}
+
+    ${cur && html`<div class="wshow-focus" onClick=${(e) => e.target === e.currentTarget && setFocus(null)}>
+      <div class="wshow-card focus">
+        <div class="wf-top">
+          <button class="btn big" disabled=${fi <= 0} onClick=${() => setFocus(list[fi - 1].id)}>◀</button>
+          <div class="wshow-task">${taskInfo(cur)?.emoji || '🌈'} ${taskInfo(cur)?.title || '자유 주제'} · ${fi + 1} / ${list.length}</div>
+          <button class="btn big" disabled=${fi >= list.length - 1} onClick=${() => setFocus(list[fi + 1].id)}>▶</button>
+          <button class="btn" onClick=${() => setFocus(null)}>✕</button>
+        </div>
+        <div class="wshow-author">${!hide && html`<${AvatarImg} cfg=${d.byId[cur.user_id]?.avatar_cfg} size=${56} />`} ${nameOf(cur)} <span class=${'pill ' + STATUS[cur.status][1]}>${STATUS[cur.status][0]}</span></div>
+        <div class="wshow-text">“${cur.final_text || exampleSentence(cur.fields || {}) || '…'}” <${SpeakBtn} text=${cur.final_text || exampleSentence(cur.fields || {})} /></div>
+        ${!cur.final_text && html`<div class="muted">(아직 이어 쓰기 전이라 여섯 칸을 이어 붙여 보여 줘요)</div>`}
+        <div class="wshow-fields">${FIELDS.map((f) => {
+          const pass = cur.checks?.passed?.[f.k];
+          return html`<span class=${cur.fields?.[f.k] ? (cur.checks?.passed ? (pass ? 'pass' : 'fail') : '') : 'empty'}><small>${f.icon} ${f.label}${cur.checks?.passed && cur.fields?.[f.k] ? (pass ? ' ✅' : ' 💡') : ''}</small>${cur.fields?.[f.k] || '—'}</span>`;
+        })}</div>
+        ${cur.teacher_feedback && html`<div class="t-feedback big">💬 선생님: ${cur.teacher_feedback}</div>`}
+        <${FeedbackBar} key=${cur.id} x=${cur} onSaved=${saved} big
+          extra=${html`<button class="btn" onClick=${() => setPraise(cur.user_id)}>🎁 칭찬하기</button>`} />
+      </div>
     </div>`}
-    ${list.length > 1 && html`<div class="wshow-nav"><button class="btn big" onClick=${() => setIdx((i) => Math.max(0, i - 1))}>◀</button><button class="btn big" onClick=${() => setIdx((i) => i + 1)}>▶</button></div>`}
+    ${praise && html`<${PraiseModal} only=${praise} onClose=${() => setPraise(null)} />`}
   </div>`;
 }
