@@ -449,7 +449,8 @@ input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; accent-
 /* ---------- 아바타 · 코인 · 상점 ---------- */
 .avatar-img { display: inline-block; flex: none; line-height: 0; }
 .avatar-img svg { width: 100%; height: 100%; display: block; }
-.avatar-img.portrait svg { border-radius: 50%; box-shadow: 0 0 0 3px #fff, 0 2px 8px rgba(40, 50, 120, 0.15); }
+.avatar-img.portrait svg { border-radius: 22%; box-shadow: 0 0 0 3px #fff, 0 2px 8px rgba(40, 50, 120, 0.15); }
+.avatar-img svg { image-rendering: pixelated; }
 .avatar-img.full svg { border-radius: 16px; }
 .me-chip-body { display: flex; flex-direction: column; gap: 2px; min-width: 110px; }
 .coin-chip { font-size: 0.75em; font-weight: 800; color: #9a6b00; }
